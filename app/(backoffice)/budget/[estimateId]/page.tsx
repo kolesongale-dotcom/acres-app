@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { ESTIMATE_INCLUDE, computeEstimate } from "@/lib/estimateCalc";
-import { getPaintCatalog } from "@/lib/priceCatalog";
-import { getCurrentRatesAndDefaults } from "@/lib/jobRates";
+import { ESTIMATE_INCLUDE } from "@/lib/estimateCalc";
 import { ensureBudgetEntry } from "@/lib/actions/estimates";
 import { customerName, formatDate } from "@/lib/format";
 import BudgetDetail from "./BudgetDetail";
@@ -27,8 +25,6 @@ export default async function BudgetDetailPage({
   // Make sure a budget entry exists with fresh estimated values.
   await ensureBudgetEntry(estimateId);
   const entry = await prisma.budgetEntry.findUnique({ where: { estimateId } });
-  const [catalog, { defaults }] = await Promise.all([getPaintCatalog(), getCurrentRatesAndDefaults()]);
-  const { totals } = computeEstimate(estimate as any, catalog, defaults);
 
   const dates =
     estimate.startDate || estimate.endDate
@@ -44,16 +40,16 @@ export default async function BudgetDetailPage({
       customer={customerName(estimate.customer)}
       dates={dates}
       estimated={{
-        revenue: entry?.estimatedRevenue ?? totals.grandTotal,
-        labor: entry?.estimatedLaborCost ?? totals.laborTotal,
-        material: entry?.estimatedMaterialCost ?? totals.materialTotal,
-        overhead: entry?.estimatedOverhead ?? totals.overheadTotal,
+        revenue: entry?.estimatedRevenue ?? 0,
+        paint: entry?.estimatedPaintCost ?? 0,
+        material: entry?.estimatedMaterialCost ?? 0,
+        labor: entry?.estimatedLaborCost ?? 0,
       }}
       actual={{
         actualRevenue: entry?.actualRevenue ?? 0,
-        actualLaborCost: entry?.actualLaborCost ?? 0,
+        actualPaintCost: entry?.actualPaintCost ?? 0,
         actualMaterialCost: entry?.actualMaterialCost ?? 0,
-        actualOverhead: entry?.actualOverhead ?? 0,
+        actualLaborCost: entry?.actualLaborCost ?? 0,
         notes: entry?.notes ?? "",
       }}
     />

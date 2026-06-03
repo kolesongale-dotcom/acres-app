@@ -503,12 +503,17 @@ model ZohoConfig {
 model BudgetEntry {
   id                    Int      @id @default(autoincrement())
   estimateId            Int      @unique
+  // Revenue = accepted-tier price. Paint + Material costs auto-derived at unit
+  // cost (no markup). Labor is the owner's hand-entered expected cost. Overhead
+  // columns retained for back-compat but no longer surfaced.
   estimatedRevenue      Float    @default(0)
   estimatedLaborCost    Float    @default(0)
+  estimatedPaintCost    Float    @default(0)
   estimatedMaterialCost Float    @default(0)
   estimatedOverhead     Float    @default(0)
   actualRevenue         Float    @default(0)
   actualLaborCost       Float    @default(0)
+  actualPaintCost       Float    @default(0)
   actualMaterialCost    Float    @default(0)
   actualOverhead        Float    @default(0)
   notes                 String   @default("")

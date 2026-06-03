@@ -9,16 +9,16 @@ import { updateBudgetActuals } from "@/lib/actions/budget";
 import { formatCurrency } from "@/lib/calculations";
 
 interface Estimated {
-  revenue: number;
-  labor: number;
-  material: number;
-  overhead: number;
+  revenue: number;  // accepted-tier price (auto)
+  paint: number;    // paint+primer at unit cost (auto)
+  material: number; // other materials at unit cost (auto)
+  labor: number;    // owner's expected labor (editable)
 }
 interface Actual {
   actualRevenue: number;
-  actualLaborCost: number;
+  actualPaintCost: number;
   actualMaterialCost: number;
-  actualOverhead: number;
+  actualLaborCost: number;
   notes: string;
 }
 
@@ -40,26 +40,28 @@ export default function BudgetDetail({
   const router = useRouter();
   const { success, error } = useToast();
   const [pending, start] = useTransition();
-  const [form, setForm] = useState(actual);
+  // Form holds the editable values: expected labor + all actuals + notes.
+  const [form, setForm] = useState({ estLabor: estimated.labor, ...actual });
   const [dirty, setDirty] = useState(false);
 
-  const set = (k: keyof Actual, v: number | string) => {
+  const set = (k: keyof typeof form, v: number | string) => {
     setForm((f) => ({ ...f, [k]: v }));
     setDirty(true);
   };
 
-  const estCost = estimated.labor + estimated.material + estimated.overhead;
-  const actCost = form.actualLaborCost + form.actualMaterialCost + form.actualOverhead;
+  const estCost = estimated.paint + estimated.material + form.estLabor;
+  const actCost = form.actualPaintCost + form.actualMaterialCost + form.actualLaborCost;
   const estProfit = estimated.revenue - estCost;
   const actProfit = form.actualRevenue - actCost;
 
   function save() {
     start(async () => {
       const res = await updateBudgetActuals(estimateId, {
+        estimatedLaborCost: form.estLabor,
         actualRevenue: form.actualRevenue,
         actualLaborCost: form.actualLaborCost,
+        actualPaintCost: form.actualPaintCost,
         actualMaterialCost: form.actualMaterialCost,
-        actualOverhead: form.actualOverhead,
         notes: form.notes,
       });
       if (res.success) { success("Budget saved."); setDirty(false); router.refresh(); }
@@ -67,12 +69,32 @@ export default function BudgetDetail({
     });
   }
 
-  const rows: { label: string; est: number; actKey?: keyof Actual; actVal: number }[] = [
-    { label: "Revenue", est: estimated.revenue, actKey: "actualRevenue", actVal: form.actualRevenue },
-    { label: "Labor Cost", est: estimated.labor, actKey: "actualLaborCost", actVal: form.actualLaborCost },
-    { label: "Material Cost", est: estimated.material, actKey: "actualMaterialCost", actVal: form.actualMaterialCost },
-    { label: "Overhead", est: estimated.overhead, actKey: "actualOverhead", actVal: form.actualOverhead },
+  type Row = {
+    label: string;
+    est: number;
+    estKey?: keyof typeof form; // present => editable estimated cell (labor)
+    actKey: keyof typeof form;
+    actVal: number;
+    isRevenue?: boolean;
+  };
+  const rows: Row[] = [
+    { label: "Revenue", est: estimated.revenue, actKey: "actualRevenue", actVal: form.actualRevenue, isRevenue: true },
+    { label: "Paint Cost", est: estimated.paint, actKey: "actualPaintCost", actVal: form.actualPaintCost },
+    { label: "Materials Cost", est: estimated.material, actKey: "actualMaterialCost", actVal: form.actualMaterialCost },
+    { label: "Labor Cost", est: form.estLabor, estKey: "estLabor", actKey: "actualLaborCost", actVal: form.actualLaborCost },
   ];
+
+  const numInput = (key: keyof typeof form, value: number) => (
+    <input
+      type="number"
+      step="any"
+      className="input"
+      style={{ textAlign: "right", maxWidth: 150, marginLeft: "auto" }}
+      value={Number.isFinite(value) ? value : 0}
+      onFocus={(e) => e.target.select()}
+      onChange={(e) => set(key, parseFloat(e.target.value) || 0)}
+    />
+  );
 
   return (
     <div>
@@ -88,7 +110,7 @@ export default function BudgetDetail({
         <div style={{ display: "flex", gap: 10 }}>
           <Link href={`/estimates/${estimateId}`} className="btn btn-secondary">View Estimate</Link>
           <button className="btn btn-primary" onClick={save} disabled={!dirty || pending}>
-            {pending ? <LoadingSpinner size={16} /> : dirty ? "Save Actuals" : "Saved ✓"}
+            {pending ? <LoadingSpinner size={16} /> : dirty ? "Save" : "Saved ✓"}
           </button>
         </div>
       </div>
@@ -106,25 +128,16 @@ export default function BudgetDetail({
             </thead>
             <tbody>
               {rows.map((r) => {
-                // For costs, lower actual = favorable (green). For revenue, higher = favorable.
                 const diff = r.actVal - r.est;
-                const favorable = r.label === "Revenue" ? diff >= 0 : diff <= 0;
+                const favorable = r.isRevenue ? diff >= 0 : diff <= 0;
                 const color = diff === 0 ? "var(--text-dim)" : favorable ? "var(--accent)" : "#f87171";
                 return (
                   <tr key={r.label}>
                     <td style={{ fontWeight: 600 }}>{r.label}</td>
-                    <td style={{ textAlign: "right", color: "var(--text-dim)" }}>{formatCurrency(r.est)}</td>
                     <td style={{ textAlign: "right", maxWidth: 160 }}>
-                      <input
-                        type="number"
-                        step="any"
-                        className="input"
-                        style={{ textAlign: "right", maxWidth: 150, marginLeft: "auto" }}
-                        value={Number.isFinite(r.actVal) ? r.actVal : 0}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => set(r.actKey!, parseFloat(e.target.value) || 0)}
-                      />
+                      {r.estKey ? numInput(r.estKey, form.estLabor) : <span style={{ color: "var(--text-dim)" }}>{formatCurrency(r.est)}</span>}
                     </td>
+                    <td style={{ textAlign: "right", maxWidth: 160 }}>{numInput(r.actKey, r.actVal)}</td>
                     <td style={{ textAlign: "right", color, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
                       {diff >= 0 ? "+" : "−"}{formatCurrency(Math.abs(diff))}
                     </td>
@@ -142,6 +155,10 @@ export default function BudgetDetail({
             </tbody>
           </table>
           <div style={{ padding: 20, borderTop: "1px solid var(--border-light)" }}>
+            <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 12px" }}>
+              Revenue, Paint, and Materials are auto-figured from the estimate (paint &amp; materials at your
+              cost). Enter your <strong>expected labor</strong> now; fill the <strong>Actual</strong> column once the job is complete.
+            </p>
             <label className="label">Job Budget Notes</label>
             <textarea className="textarea" value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Receipts, change orders, labor notes…" />
           </div>

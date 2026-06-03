@@ -6,7 +6,36 @@ import { ActionResult, FullEstimatePayload } from "@/lib/types";
 import { ESTIMATE_INCLUDE, computeEstimate } from "@/lib/estimateCalc";
 import { getPaintCatalog } from "@/lib/priceCatalog";
 import { getCurrentRatesAndDefaults } from "@/lib/jobRates";
+import { calcTiers, type CalcLineItem } from "@/lib/calculations";
 import { revalidatePath } from "next/cache";
+
+/** Split Material-category lines into paint/primer cost vs other materials cost (at unit cost, no markup). */
+function budgetCostBreakdown(lines: CalcLineItem[]): { paint: number; material: number } {
+  let paint = 0, material = 0;
+  for (const l of lines) {
+    if (l.category !== "Material") continue;
+    const cost = (Number(l.unitCost) || 0) * (Number(l.quantity) || 0);
+    if (/^Paint — |^Primer — /.test(l.description)) paint += cost;
+    else material += cost;
+  }
+  return { paint, material };
+}
+
+/** Budget revenue = the price of the proposal's accepted tier (full price if none). */
+async function budgetRevenue(estimateId: number, grandTotal: number): Promise<number> {
+  const [proposal, biz] = await Promise.all([
+    prisma.proposal.findUnique({ where: { estimateId } }),
+    prisma.businessSettings.findUnique({ where: { id: 1 } }),
+  ]);
+  const tiers = calcTiers(grandTotal, {
+    midDepositPercent: biz?.midDepositPercent ?? 15,
+    midDepositDiscount: biz?.midDepositDiscount ?? 3,
+    maxDepositPercent: biz?.maxDepositPercent ?? 30,
+    maxDepositDiscount: biz?.maxDepositDiscount ?? 6,
+  });
+  const tier = proposal?.selectedTier ?? "full";
+  return tier === "mid" ? tiers.mid.total : tier === "max" ? tiers.max.total : tiers.full.total;
+}
 
 export async function createEstimate(
   customerId?: number | null
@@ -459,27 +488,29 @@ export async function ensureBudgetEntry(estimateId: number): Promise<void> {
   });
   if (!est) return;
   const [catalog, rd] = await Promise.all([getPaintCatalog(), getCurrentRatesAndDefaults()]);
-  const { totals } = computeEstimate(est as any, catalog, rd.defaults);
+  const { generated, totals } = computeEstimate(est as any, catalog, rd.defaults);
+  const { paint, material } = budgetCostBreakdown(generated);
+  const revenue = await budgetRevenue(estimateId, totals.grandTotal);
 
   if (existing) {
-    // Refresh estimated values; preserve actuals + notes.
+    // Refresh the auto-derived figures; preserve actuals, notes, and the
+    // owner's hand-entered expected labor.
     await prisma.budgetEntry.update({
       where: { estimateId },
       data: {
-        estimatedRevenue: totals.grandTotal,
-        estimatedLaborCost: totals.laborTotal,
-        estimatedMaterialCost: totals.materialTotal,
-        estimatedOverhead: totals.overheadTotal,
+        estimatedRevenue: revenue,
+        estimatedPaintCost: paint,
+        estimatedMaterialCost: material,
       },
     });
   } else {
     await prisma.budgetEntry.create({
       data: {
         estimateId,
-        estimatedRevenue: totals.grandTotal,
-        estimatedLaborCost: totals.laborTotal,
-        estimatedMaterialCost: totals.materialTotal,
-        estimatedOverhead: totals.overheadTotal,
+        estimatedRevenue: revenue,
+        estimatedPaintCost: paint,
+        estimatedMaterialCost: material,
+        estimatedLaborCost: 0,
       },
     });
   }

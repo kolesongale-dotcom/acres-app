@@ -8,10 +8,11 @@ import { revalidatePath } from "next/cache";
 export async function updateBudgetActuals(
   estimateId: number,
   input: {
+    estimatedLaborCost: number; // owner's expected labor (revenue/paint/materials stay auto)
     actualRevenue: number;
     actualLaborCost: number;
+    actualPaintCost: number;
     actualMaterialCost: number;
-    actualOverhead: number;
     notes: string;
   }
 ): Promise<ActionResult> {
@@ -21,10 +22,11 @@ export async function updateBudgetActuals(
     await prisma.budgetEntry.update({
       where: { estimateId },
       data: {
+        estimatedLaborCost: input.estimatedLaborCost,
         actualRevenue: input.actualRevenue,
         actualLaborCost: input.actualLaborCost,
+        actualPaintCost: input.actualPaintCost,
         actualMaterialCost: input.actualMaterialCost,
-        actualOverhead: input.actualOverhead,
         notes: input.notes,
       },
     });

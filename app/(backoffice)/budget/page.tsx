@@ -33,14 +33,14 @@ export default async function BudgetPage() {
 
     const estRevenue = entry?.estimatedRevenue ?? totals.grandTotal;
     const estCost =
-      (entry?.estimatedLaborCost ?? totals.laborTotal) +
-      (entry?.estimatedMaterialCost ?? totals.materialTotal) +
-      (entry?.estimatedOverhead ?? totals.overheadTotal);
+      (entry?.estimatedPaintCost ?? 0) +
+      (entry?.estimatedMaterialCost ?? 0) +
+      (entry?.estimatedLaborCost ?? 0);
     const actRevenue = entry?.actualRevenue ?? 0;
     const actCost =
-      (entry?.actualLaborCost ?? 0) +
+      (entry?.actualPaintCost ?? 0) +
       (entry?.actualMaterialCost ?? 0) +
-      (entry?.actualOverhead ?? 0);
+      (entry?.actualLaborCost ?? 0);
 
     const estProfit = estRevenue - estCost;
     const actProfit = actRevenue - actCost;
