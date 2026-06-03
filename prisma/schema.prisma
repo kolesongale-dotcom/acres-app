@@ -431,6 +431,10 @@ model Proposal {
   signedAt       DateTime?
   sentAt         DateTime?
   viewedAt       DateTime?
+  // Snapshot of the estimator's original paint pick per surface, captured at
+  // generation: JSON map of "kind:id:field" -> paintId. Drives the "Recommended"
+  // tag on the client proposal even after the client swaps paints.
+  recommendedPaints String @default("{}")
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   estimate       Estimate  @relation(fields: [estimateId], references: [id], onDelete: Cascade)

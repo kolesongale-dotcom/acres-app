@@ -11,6 +11,15 @@ export const dynamic = "force-dynamic";
 
 const ACCENT = "#16a34a";
 
+function parseRecommended(json: string): Record<string, number> {
+  try {
+    const r = JSON.parse(json);
+    return r && typeof r === "object" ? r : {};
+  } catch {
+    return {};
+  }
+}
+
 export default async function SignPage({
   params,
 }: {
@@ -153,6 +162,7 @@ export default async function SignPage({
               interior: settings?.resourceInteriorUrl ?? "",
               exterior: settings?.resourceExteriorUrl ?? "",
             }}
+            recommended={parseRecommended(proposal.recommendedPaints)}
           >
             {proposal.estimate.photos.length > 0 && (
               <Section title="Project Photos">

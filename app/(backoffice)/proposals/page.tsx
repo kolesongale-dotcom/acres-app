@@ -61,9 +61,9 @@ export default async function ProposalsPage() {
   }));
 
   // Metrics
-  const awaitingValue = enriched
-    .filter((p) => p.status === "Sent" || p.status === "Pending")
-    .reduce((s, p) => s + p.total, 0);
+  const awaitingCount = enriched.filter(
+    (p) => p.status === "Sent" || p.status === "Pending"
+  ).length;
   const activeDrafts = enriched.filter((p) => p.status === "Draft").length;
   const thirtyDaysAgo = Date.now() - 30 * 86400000;
   const closedRevenue = enriched
@@ -75,7 +75,7 @@ export default async function ProposalsPage() {
     .reduce((s, p) => s + p.total, 0);
 
   const cards = [
-    { label: "Awaiting Signature", value: formatCurrency(awaitingValue), icon: "◷", accent: "var(--warning)" },
+    { label: "Awaiting Response", value: String(awaitingCount), icon: "◷", accent: "var(--warning)" },
     { label: "Active Drafts", value: String(activeDrafts), icon: "▤", accent: "var(--info)" },
     { label: "Closed Revenue (30 Days)", value: formatCurrency(closedRevenue), icon: "✓", accent: "var(--accent)" },
   ];

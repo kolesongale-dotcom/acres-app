@@ -13,6 +13,12 @@ export interface FollowUpRow {
   customerId: number;
   customerName: string;
   estimateId: number | null;
+  // "auto" rows are derived from proposals sitting in Sent/Pending for 14+ days.
+  // They have no DB record — no complete/dismiss; they vanish when the proposal's
+  // status changes. `href` links to the proposal; `ageDays` is days awaiting.
+  kind?: "manual" | "auto";
+  href?: string;
+  ageDays?: number;
 }
 
 export default function FollowUpList({ items }: { items: FollowUpRow[] }) {
@@ -49,17 +55,18 @@ export default function FollowUpList({ items }: { items: FollowUpRow[] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {rows.map((f) => {
-        const overdue = new Date(f.dueDate).getTime() < Date.now() - 86400000;
+        const isAuto = f.kind === "auto";
+        const overdue = !isAuto && new Date(f.dueDate).getTime() < Date.now() - 86400000;
         return (
           <div
-            key={f.id}
+            key={isAuto ? `auto-${f.id}` : f.id}
             style={{
               display: "flex",
               alignItems: "center",
               gap: 12,
               padding: "12px 14px",
               background: "var(--bg-secondary)",
-              border: `1px solid ${overdue ? "rgba(239,68,68,0.4)" : "var(--border-light)"}`,
+              border: `1px solid ${overdue || isAuto ? "rgba(245,158,11,0.45)" : "var(--border-light)"}`,
               borderRadius: 10,
             }}
           >
@@ -81,27 +88,37 @@ export default function FollowUpList({ items }: { items: FollowUpRow[] }) {
                   {f.customerName}
                 </Link>
                 {" · "}
-                <span style={{ color: overdue ? "#f87171" : "var(--text-dim)" }}>
-                  {overdue
+                <span style={{ color: overdue ? "#f87171" : isAuto ? "var(--warning)" : "var(--text-dim)" }}>
+                  {isAuto
+                    ? `Awaiting response ${f.ageDays ?? 14}d`
+                    : overdue
                     ? `Overdue ${daysSince(f.dueDate)}d`
                     : `Due ${formatDate(f.dueDate)}`}
                 </span>
               </div>
             </div>
-            <button
-              className="btn btn-sm btn-primary"
-              onClick={() => complete(f.id)}
-              title="Mark complete"
-            >
-              ✓
-            </button>
-            <button
-              className="btn btn-sm btn-ghost"
-              onClick={() => dismiss(f.id)}
-              title="Dismiss"
-            >
-              ✕
-            </button>
+            {isAuto ? (
+              <Link className="btn btn-sm btn-secondary" href={f.href ?? "#"} title="Open proposal">
+                View →
+              </Link>
+            ) : (
+              <>
+                <button
+                  className="btn btn-sm btn-primary"
+                  onClick={() => complete(f.id)}
+                  title="Mark complete"
+                >
+                  ✓
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost"
+                  onClick={() => dismiss(f.id)}
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
+              </>
+            )}
           </div>
         );
       })}

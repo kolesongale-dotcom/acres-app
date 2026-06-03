@@ -23,6 +23,23 @@ import { formatDateTime } from "@/lib/format";
 
 interface Procedure { id: number; category: string; title: string; description: string }
 
+/**
+ * Place the interactive sign link prominently in the email body — right after the
+ * "...digital signature for easy acceptance" line so clients don't miss it. Falls
+ * back to appending at the bottom if that line isn't in the template.
+ */
+function insertSignLink(body: string, url: string): string {
+  if (!url) return body;
+  const linkBlock = `\n👉 Review your options, choose a deposit tier, and sign your proposal online here:\n${url}\n`;
+  const lines = body.split("\n");
+  const idx = lines.findIndex((l) => /digital signature/i.test(l));
+  if (idx >= 0) {
+    lines.splice(idx + 1, 0, linkBlock);
+    return lines.join("\n");
+  }
+  return `${body}\n\n— — —${linkBlock}`;
+}
+
 export default function ProposalDetail({
   proposal,
   estimate,
@@ -84,9 +101,7 @@ export default function ProposalDetail({
   // body shown/copied, and use the rest (placeholders filled) as the email body.
   const filledFull = fillTemplate(emailTemplate);
   const baseBody = filledFull.replace(/^subject:.*\n?/i, "").replace(/^\s*\n/, "");
-  const filledBody = signUrl
-    ? `${baseBody}\n\n— — —\nReview your options, choose a deposit tier, and sign your proposal online here:\n${signUrl}\n`
-    : baseBody;
+  const filledBody = insertSignLink(baseBody, signUrl);
   const mailtoHref = `mailto:${encodeURIComponent(estimate.clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(filledBody)}`;
 
   function changeStatus(next: string) {

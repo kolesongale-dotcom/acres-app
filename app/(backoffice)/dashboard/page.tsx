@@ -56,14 +56,44 @@ export default async function DashboardPage() {
     include: { customer: true },
     orderBy: { dueDate: "asc" },
   });
-  const followUps: FollowUpRow[] = followUpsRaw.map((f) => ({
+  const manualFollowUps: FollowUpRow[] = followUpsRaw.map((f) => ({
     id: f.id,
     note: f.note,
     dueDate: f.dueDate.toISOString(),
     customerId: f.customerId,
     customerName: customerName(f.customer),
     estimateId: f.estimateId,
+    kind: "manual",
   }));
+
+  // Auto follow-ups: proposals sitting in Sent/Pending for 14+ days. Derived (no
+  // DB record) so they appear/disappear automatically as the status changes.
+  const STALE_DAYS = 14;
+  const staleProposals = await prisma.proposal.findMany({
+    where: { status: { in: ["Sent", "Pending"] } },
+    include: { estimate: { include: { customer: true } } },
+  });
+  const autoFollowUps: FollowUpRow[] = staleProposals
+    .map((p) => {
+      const since = p.sentAt ?? p.updatedAt;
+      const ageDays = Math.floor((Date.now() - since.getTime()) / 86400000);
+      return { p, since, ageDays };
+    })
+    .filter((x) => x.ageDays >= STALE_DAYS)
+    .sort((a, b) => b.ageDays - a.ageDays)
+    .map(({ p, since, ageDays }) => ({
+      id: p.id,
+      note: `No response yet — ${p.estimate.projectName || "proposal"} (${p.status})`,
+      dueDate: since.toISOString(),
+      customerId: p.estimate.customerId ?? 0,
+      customerName: customerName(p.estimate.customer),
+      estimateId: p.estimateId,
+      kind: "auto" as const,
+      href: `/proposals/${p.id}`,
+      ageDays,
+    }));
+
+  const followUps: FollowUpRow[] = [...autoFollowUps, ...manualFollowUps];
 
   const metrics = [
     { label: "Pipeline Value", value: formatCurrency(totalValue), sub: `${cards.length} estimates` },

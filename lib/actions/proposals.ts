@@ -103,8 +103,20 @@ export async function generateProposal(
     });
     const includedSOPs = JSON.stringify(defaults.map((d) => d.id));
 
+    // Snapshot the estimator's current paint pick per surface as the recommendation.
+    const [est, catalog, rd] = await Promise.all([
+      prisma.estimate.findUnique({ where: { id: estimateId }, include: ESTIMATE_INCLUDE }),
+      getPaintCatalog(),
+      getCurrentRatesAndDefaults(),
+    ]);
+    const recommended: Record<string, number> = {};
+    if (est) {
+      const slots = extractPaintSlots(toFullEstimateInput(est as any, catalog, rd.defaults), catalog);
+      for (const s of slots) recommended[`${s.ref.kind}:${s.ref.id}:${s.ref.field}`] = s.currentPaintId;
+    }
+
     const proposal = await prisma.proposal.create({
-      data: { proposalNumber, estimateId, includedSOPs },
+      data: { proposalNumber, estimateId, includedSOPs, recommendedPaints: JSON.stringify(recommended) },
     });
 
     revalidatePath("/proposals");

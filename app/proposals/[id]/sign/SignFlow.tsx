@@ -16,6 +16,7 @@ export default function SignFlow({
   initialTier,
   accent,
   resources,
+  recommended,
   children,
 }: {
   proposalId: number;
@@ -24,6 +25,7 @@ export default function SignFlow({
   initialTier: string;
   accent: string;
   resources?: { interior: string; exterior: string };
+  recommended?: Record<string, number>; // "kind:id:field" -> recommended paintId
   children?: React.ReactNode; // static sections (photos, notes, SOPs, terms)
 }) {
   const [lightbox, setLightbox] = useState<{ src: string; title: string } | null>(null);
@@ -193,10 +195,17 @@ export default function SignFlow({
                 const opts = optionsByCategory[slot.category] ?? [];
                 const current = catalog[slot.currentPaintId];
                 const perGal = current ? retailPerGallon(current) : 0;
+                const recId = recommended?.[`${slot.ref.kind}:${slot.ref.id}:${slot.ref.field}`];
+                const onRecommended = recId != null && recId === slot.currentPaintId;
                 return (
                   <div key={`${slot.ref.kind}-${slot.ref.id}-${slot.ref.field}`} style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ minWidth: 180 }}>
-                      <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 14.5 }}>{slot.label}</div>
+                      <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 14.5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        {slot.label}
+                        {onRecommended && (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: "#15803d", background: "#dcfce7", borderRadius: 999, padding: "2px 8px" }}>★ Recommended</span>
+                        )}
+                      </div>
                       <div style={{ fontSize: 12, color: "#94a3b8" }}>{slot.category} · {formatCurrency(perGal)}/gal</div>
                     </div>
                     <select
@@ -206,7 +215,7 @@ export default function SignFlow({
                     >
                       {opts.map((o) => (
                         <option key={o.id} value={o.id}>
-                          {o.name} — {formatCurrency(o.perGal)}/gal
+                          {o.name} — {formatCurrency(o.perGal)}/gal{o.id === recId ? "  ★ Recommended" : ""}
                         </option>
                       ))}
                     </select>
