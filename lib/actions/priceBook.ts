@@ -12,6 +12,7 @@ export interface PriceBookInput {
   unitCost: number;
   markup: number;
   coverage?: number;
+  category?: string; // paints only — see PAINT_CATEGORIES
   notes?: string;
 }
 
@@ -33,6 +34,7 @@ export async function createPriceBookItem(
         unitCost: input.unitCost,
         markup: input.markup,
         coverage: input.coverage ?? 400,
+        category: input.type === "paint" ? (input.category ?? "Interior Wall/Ceiling") : "Interior Wall/Ceiling",
         notes: input.notes ?? "",
         sortOrder: (max._max.sortOrder ?? 0) + 1,
       },
@@ -59,6 +61,7 @@ export async function updatePriceBookItem(
         ...(input.unitCost !== undefined && { unitCost: input.unitCost }),
         ...(input.markup !== undefined && { markup: input.markup }),
         ...(input.coverage !== undefined && { coverage: input.coverage }),
+        ...(input.category !== undefined && { category: input.category }),
         ...(input.notes !== undefined && { notes: input.notes }),
       },
     });

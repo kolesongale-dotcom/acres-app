@@ -53,7 +53,7 @@ export interface CalcLineItem {
   source?: string;
 }
 
-export type PaintCatalog = Record<number, { name: string; unitCost: number; coverage: number; markup: number }>;
+export type PaintCatalog = Record<number, { name: string; unitCost: number; coverage: number; markup: number; category?: string }>;
 
 export interface PrimerInput {
   paintId: number | null;

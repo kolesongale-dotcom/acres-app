@@ -11,7 +11,7 @@ import {
   updatePriceBookItem,
   deletePriceBookItem,
 } from "@/lib/actions/priceBook";
-import { PRICEBOOK_UNITS } from "@/lib/types";
+import { PRICEBOOK_UNITS, PAINT_CATEGORIES } from "@/lib/types";
 import { formatCurrency } from "@/lib/calculations";
 
 export interface PriceItem {
@@ -23,6 +23,7 @@ export interface PriceItem {
   unitCost: number;
   markup: number;
   coverage: number;
+  category: string;
   notes: string;
 }
 
@@ -68,6 +69,7 @@ function Section({ type, items }: { type: "paint" | "material"; items: PriceItem
               <tr>
                 <th>Name</th>
                 <th>Brand</th>
+                {isPaint && <th>Category</th>}
                 {isPaint ? <th style={{ textAlign: "right" }}>Coverage</th> : <th>Unit</th>}
                 <th style={{ textAlign: "right" }}>Cost</th>
                 <th style={{ textAlign: "right" }}>Markup</th>
@@ -107,6 +109,7 @@ function Row({ item, isPaint }: { item: PriceItem; isPaint: boolean }) {
         unitCost: form.unitCost,
         markup: form.markup,
         coverage: form.coverage,
+        category: form.category,
       });
       if (res.success) { success("Item updated."); setEditing(false); router.refresh(); }
       else error(res.error);
@@ -116,10 +119,17 @@ function Row({ item, isPaint }: { item: PriceItem; isPaint: boolean }) {
   if (editing) {
     return (
       <tr>
-        <td colSpan={isPaint ? 7 : 7}>
+        <td colSpan={isPaint ? 8 : 7}>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", padding: "4px 0" }}>
             <input className="input" style={{ flex: 2, minWidth: 160 }} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name" />
             <input className="input" style={{ flex: 1, minWidth: 110 }} value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} placeholder="Brand" />
+            {isPaint && (
+              <MiniLabeled label="category">
+                <select className="select" style={{ width: 170 }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+                  {PAINT_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                </select>
+              </MiniLabeled>
+            )}
             {isPaint ? (
               <MiniLabeled label="sf/gal"><input className="input" type="number" step="any" style={{ width: 80 }} value={form.coverage} onChange={(e) => setForm({ ...form, coverage: parseFloat(e.target.value) || 0 })} /></MiniLabeled>
             ) : (
@@ -141,6 +151,11 @@ function Row({ item, isPaint }: { item: PriceItem; isPaint: boolean }) {
     <tr>
       <td style={{ fontWeight: 600 }}>{item.name}</td>
       <td style={{ color: "var(--text-dim)" }}>{item.brand || "—"}</td>
+      {isPaint && (
+        <td>
+          <span className="badge" style={{ fontSize: 11 }}>{item.category}</span>
+        </td>
+      )}
       {isPaint ? (
         <td style={{ textAlign: "right", color: "var(--text-dim)" }}>{item.coverage} sf/gal</td>
       ) : (
@@ -183,6 +198,7 @@ function AddForm({ type }: { type: "paint" | "material" }) {
     unitCost: 0,
     markup: 35,
     coverage: isPaint ? 400 : 400,
+    category: "Interior Wall/Ceiling",
     notes: "",
   };
   const [form, setForm] = useState(blank);
@@ -204,6 +220,13 @@ function AddForm({ type }: { type: "paint" | "material" }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Field label="Name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder={isPaint ? "e.g. Cashmere Eggshell" : "e.g. Plastic Sheeting"} /></Field>
         <Field label="Brand"><input className="input" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} /></Field>
+        {isPaint && (
+          <Field label="Category">
+            <select className="select" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
+              {PAINT_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </Field>
+        )}
         {isPaint ? (
           <Field label="Coverage (sq ft / gallon)"><input className="input" type="number" step="any" value={form.coverage} onChange={(e) => setForm({ ...form, coverage: parseFloat(e.target.value) || 0 })} /></Field>
         ) : (

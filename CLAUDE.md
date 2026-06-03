@@ -159,11 +159,35 @@ and client-side in the builder. Pass it everywhere `computeEstimate(est, catalog
 
 ## Price Book (`/price-book`)
 
-Two sections — **Paint** (cost/gallon + coverage sf/gal + per-item markup) and **Materials &
-Supplies** (cost/unit + unit + per-item markup). Markup varies per item. Paint products are
-selectable on every paintable surface/component in the estimate builder via `PaintSelect`;
-materials are pulled into an estimate's Summary tab. Actions in `lib/actions/priceBook.ts`.
-Editing a Price Book price does not retro-change saved estimates until the estimate is re-saved.
+Two sections — **Paint** (cost/gallon + coverage sf/gal + per-item markup + **category**) and
+**Materials & Supplies** (cost/unit + unit + per-item markup). Markup varies per item. Paint
+products are selectable on every paintable surface/component in the estimate builder via
+`PaintSelect` (options grouped by category); materials are pulled into an estimate's Summary tab.
+Actions in `lib/actions/priceBook.ts`. Editing a Price Book price does not retro-change saved
+estimates until the estimate is re-saved.
+
+**Paint categories** (`PriceBookItem.category`, `PAINT_CATEGORIES` in `lib/types.ts`): Interior
+Wall/Ceiling, Interior Trim/Door, Exterior, Cabinet, Deck/Stain, Primer. A surface's category is
+*derived from the paint assigned to it* (no per-surface category field). On the client sign page the
+client may swap a surface's paint to any Price Book paint **in the same category** — except `Primer`,
+which is locked (`CLIENT_SELECTABLE_CATEGORIES`).
+
+## Client-selectable paints on the proposal
+
+The client sign page (`SignFlow.tsx`) lets clients change the paint per surface and watch the price
+re-compute live:
+- `lib/paintSlots.ts` (client+server safe): `extractPaintSlots(input, catalog)` → one `PaintSlot`
+  per painted surface (room walls/ceiling/trim, cabinets, deck floor/rail, siding, doors, shutters,
+  garage, custom) whose effective paint's category is client-selectable and has ≥2 options; primer
+  slots are never included. `applyPaintSelection(input, ref, paintId)` returns a new calc input.
+- `SignFlow` holds the `FullEstimateInput` in state, recomputes `computeAll` + `calcTiers` on every
+  change (pure engine → instant), and renders the breakdown, a **Choose Your Paint** section
+  (dropdowns showing name + **retail $/gal** = cost×markup), the tiers, and the signature. Static
+  sections (photos/notes/SOPs/terms) are passed in as `children` from the server `page.tsx`.
+- Persistence: `selectPaintPublic(proposalId, ref, paintId)` (in `lib/actions/proposals.ts`) writes
+  the chosen paint to the estimate's component field, after re-deriving the slot to validate
+  ownership + **same-category** (anti-tamper) + not-yet-signed. So the accepted proposal, PDF, and
+  budget all reflect the client's choices. Coverage differs per paint, so swapping changes gallons.
 
 ## Key workflows
 

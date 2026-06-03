@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { ESTIMATE_INCLUDE, computeEstimate } from "@/lib/estimateCalc";
+import { ESTIMATE_INCLUDE, toFullEstimateInput } from "@/lib/estimateCalc";
 import { getPaintCatalog } from "@/lib/priceCatalog";
 import { getCurrentRatesAndDefaults } from "@/lib/jobRates";
-import { calcTiers, formatCurrency } from "@/lib/calculations";
+import { TierSettings } from "@/lib/calculations";
 import { customerName, formatDateTime } from "@/lib/format";
-import SignClient from "./SignClient";
+import SignFlow from "./SignFlow";
 
 export const dynamic = "force-dynamic";
 
@@ -44,40 +44,15 @@ export default async function SignPage({
   }
 
   const [catalog, { defaults }] = await Promise.all([getPaintCatalog(), getCurrentRatesAndDefaults()]);
-  const { services, totals } = computeEstimate(proposal.estimate as any, catalog, defaults);
-  const tierPricing = calcTiers(totals.grandTotal, {
+  // Calc input passed to the interactive flow so it can recompute totals live as
+  // the client swaps paints. paintCatalog carries categories + prices.
+  const calcInput = toFullEstimateInput(proposal.estimate as any, catalog, defaults);
+  const tierSettings: TierSettings = {
     midDepositPercent: settings?.midDepositPercent ?? 15,
     midDepositDiscount: settings?.midDepositDiscount ?? 3,
     maxDepositPercent: settings?.maxDepositPercent ?? 30,
     maxDepositDiscount: settings?.maxDepositDiscount ?? 6,
-  });
-
-  const tiers = [
-    {
-      key: "full",
-      label: "Full Price",
-      sublabel: "Paid at completion",
-      total: tierPricing.full.total,
-      deposit: 0,
-      savings: 0,
-    },
-    {
-      key: "mid",
-      label: `${tierPricing.mid.depositPercent}% Deposit`,
-      sublabel: `Save ${tierPricing.mid.discountPercent}% upfront`,
-      total: tierPricing.mid.total,
-      deposit: tierPricing.mid.deposit,
-      savings: tierPricing.mid.savings,
-    },
-    {
-      key: "max",
-      label: `${tierPricing.max.depositPercent}% Deposit`,
-      sublabel: `Save ${tierPricing.max.discountPercent}% — best value`,
-      total: tierPricing.max.total,
-      deposit: tierPricing.max.deposit,
-      savings: tierPricing.max.savings,
-    },
-  ];
+  };
 
   // Selected SOPs
   let sopIds: number[] = [];
@@ -168,35 +143,13 @@ export default async function SignPage({
             signatureData={proposal.signatureData}
           />
         ) : (
-          <div style={{ marginTop: 36 }}>
-            {/* Scope — one row per item (name + total) */}
-            <Section title="Services Breakdown">
-              <div style={{ background: "#fff", borderRadius: 14, padding: "8px 4px", border: "1px solid #e2e8f0" }}>
-                {services.map((s) => (
-                  <div key={s.key} style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "14px 18px", borderBottom: "1px solid #f1f5f9" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 15.5, fontWeight: 700, color: "#0f172a" }}>{s.name}</div>
-                      {s.subtitle && <div style={{ fontSize: 12.5, color: "#94a3b8", marginTop: 3, fontStyle: "italic", lineHeight: 1.5 }}>{s.subtitle}</div>}
-                    </div>
-                    <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                      <div style={{ fontSize: 12, color: "#94a3b8" }}>{s.qtyLabel}</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: "#16a34a" }}>{formatCurrency(s.total)}</div>
-                    </div>
-                  </div>
-                ))}
-                {proposal.estimate.overheadItems.map((o) => (
-                  <div key={o.id} style={{ display: "flex", justifyContent: "space-between", padding: "12px 18px", borderBottom: "1px solid #f1f5f9", fontSize: 14.5 }}>
-                    <span style={{ color: "#334155" }}>{o.description || "Project cost"}</span>
-                    <span style={{ color: "#0f172a", fontWeight: 600 }}>{formatCurrency(o.cost * (1 + o.markup / 100))}</span>
-                  </div>
-                ))}
-                <div style={{ display: "flex", justifyContent: "space-between", padding: "18px 18px", borderTop: "2px solid #e2e8f0" }}>
-                  <span style={{ fontSize: 18, fontWeight: 800 }}>Project Total</span>
-                  <span style={{ fontSize: 18, fontWeight: 800, color: "#16a34a" }}>{formatCurrency(totals.grandTotal)}</span>
-                </div>
-              </div>
-            </Section>
-
+          <SignFlow
+            proposalId={proposal.id}
+            initialInput={calcInput}
+            tierSettings={tierSettings}
+            initialTier={proposal.selectedTier}
+            accent={ACCENT}
+          >
             {proposal.estimate.photos.length > 0 && (
               <Section title="Project Photos">
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
@@ -261,16 +214,7 @@ export default async function SignPage({
               </Section>
             )}
 
-            {/* Interactive: tiers + signature */}
-            <div style={{ marginTop: 36 }}>
-              <SignClient
-                proposalId={proposal.id}
-                initialTier={proposal.selectedTier}
-                tiers={tiers}
-                accent={ACCENT}
-              />
-            </div>
-          </div>
+          </SignFlow>
         )}
 
         <footer style={{ textAlign: "center", color: "#94a3b8", fontSize: 13, marginTop: 48, lineHeight: 1.7 }}>

@@ -11,6 +11,7 @@ export async function getPaintCatalog(): Promise<PaintCatalog> {
       unitCost: p.unitCost,
       coverage: p.coverage,
       markup: p.markup,
+      category: p.category,
     };
   }
   return catalog;

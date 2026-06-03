@@ -94,9 +94,10 @@ export interface PaintOption {
   unitCost: number;
   markup: number;
   coverage: number;
+  category?: string;
 }
 
-/** Dropdown to pick a paint product from the Price Book. */
+/** Dropdown to pick a paint product from the Price Book, grouped by category. */
 export function PaintSelect({
   options,
   value,
@@ -108,6 +109,15 @@ export function PaintSelect({
   onChange: (id: number | null, name: string) => void;
   placeholder?: string;
 }) {
+  // Group options by category so the estimator picks within the right category
+  // (the chosen paint's category drives what the client can later swap to).
+  const groups = new Map<string, PaintOption[]>();
+  for (const o of options) {
+    const cat = o.category || "Uncategorized";
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat)!.push(o);
+  }
+
   return (
     <select
       className="select"
@@ -120,11 +130,15 @@ export function PaintSelect({
       }}
     >
       <option value="">{placeholder}</option>
-      {options.map((o) => (
-        <option key={o.id} value={o.id}>
-          {o.brand ? `${o.brand} — ` : ""}
-          {o.name}
-        </option>
+      {[...groups.entries()].map(([cat, opts]) => (
+        <optgroup key={cat} label={cat}>
+          {opts.map((o) => (
+            <option key={o.id} value={o.id}>
+              {o.brand ? `${o.brand} — ` : ""}
+              {o.name}
+            </option>
+          ))}
+        </optgroup>
       ))}
     </select>
   );

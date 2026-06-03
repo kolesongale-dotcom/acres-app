@@ -18,6 +18,7 @@ export default async function PriceBookPage() {
     unitCost: i.unitCost,
     markup: i.markup,
     coverage: i.coverage,
+    category: i.category,
     notes: i.notes,
   }));
 

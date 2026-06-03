@@ -46,6 +46,24 @@ export const LEAD_SOURCES = [
   "Other",
 ] as const;
 
+// Paint categories (PriceBookItem.category). A surface's selected paint carries
+// its category; on the client proposal the client may swap to any paint sharing
+// that category — EXCEPT "Primer", which is locked.
+export const PAINT_CATEGORIES = [
+  "Interior Wall/Ceiling",
+  "Interior Trim/Door",
+  "Exterior",
+  "Cabinet",
+  "Deck/Stain",
+  "Primer",
+] as const;
+export type PaintCategory = (typeof PAINT_CATEGORIES)[number];
+
+/** Categories a client is allowed to change on the proposal (everything but Primer). */
+export const CLIENT_SELECTABLE_CATEGORIES: readonly string[] = PAINT_CATEGORIES.filter(
+  (c) => c !== "Primer"
+);
+
 export const SIDING_MATERIALS = [
   "Vinyl",
   "Stucco",

@@ -404,6 +404,10 @@ model PriceBookItem {
   unitCost  Float    @default(0)
   markup    Float    @default(30)
   coverage  Float    @default(400)
+  // Paint category (paints only). Drives which alternatives a client may pick on
+  // the proposal. One of PAINT_CATEGORIES in lib/types.ts. "Primer" is locked
+  // from client selection. Ignored for type=material.
+  category  String   @default("Interior Wall/Ceiling")
   notes     String   @default("")
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())

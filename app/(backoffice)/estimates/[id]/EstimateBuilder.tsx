@@ -105,7 +105,7 @@ export default function EstimateBuilder({
 
   const paintCatalog: PaintCatalog = useMemo(() => {
     const c: PaintCatalog = {};
-    for (const p of paintItems) c[p.id] = { name: p.name, unitCost: p.unitCost, coverage: p.coverage, markup: p.markup };
+    for (const p of paintItems) c[p.id] = { name: p.name, unitCost: p.unitCost, coverage: p.coverage, markup: p.markup, category: p.category };
     return c;
   }, [paintItems]);
 

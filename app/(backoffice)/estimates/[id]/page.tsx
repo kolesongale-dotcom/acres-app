@@ -47,7 +47,7 @@ export default async function EstimateBuilderPage({
 
   const paintItems: PaintOption[] = priceItems
     .filter((p) => p.type === "paint")
-    .map((p) => ({ id: p.id, name: p.name, brand: p.brand, unitCost: p.unitCost, markup: p.markup, coverage: p.coverage }));
+    .map((p) => ({ id: p.id, name: p.name, brand: p.brand, unitCost: p.unitCost, markup: p.markup, coverage: p.coverage, category: p.category }));
   const materialItems: MaterialCatalogEntry[] = priceItems
     .filter((p) => p.type === "material")
     .map((p) => ({ id: p.id, name: p.name, brand: p.brand, unit: p.unit, unitCost: p.unitCost, markup: p.markup }));

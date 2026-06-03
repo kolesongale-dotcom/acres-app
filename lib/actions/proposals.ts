@@ -2,9 +2,81 @@
 
 import { prisma } from "@/lib/prisma";
 import { generateFormattedNumber } from "@/lib/idGenerator";
-import { ActionResult } from "@/lib/types";
+import { ActionResult, CLIENT_SELECTABLE_CATEGORIES } from "@/lib/types";
 import { ensureBudgetEntry } from "@/lib/actions/estimates";
+import { ESTIMATE_INCLUDE, toFullEstimateInput } from "@/lib/estimateCalc";
+import { getPaintCatalog } from "@/lib/priceCatalog";
+import { getCurrentRatesAndDefaults } from "@/lib/jobRates";
+import { extractPaintSlots, isValidSlotField, type PaintSlotKind, type PaintSlotRef } from "@/lib/paintSlots";
 import { revalidatePath } from "next/cache";
+
+// Maps a slot kind to its Prisma model delegate (all have an estimateId column).
+const SLOT_DELEGATE: Record<PaintSlotKind, any> = {
+  room: () => prisma.room,
+  cabinet: () => prisma.cabinetSet,
+  deck: () => prisma.deckArea,
+  exterior: () => prisma.exteriorHouse,
+  door: () => prisma.exteriorDoor,
+  shutter: () => prisma.exteriorShutter,
+  garage: () => prisma.exteriorGarageDoor,
+  custom: () => prisma.customArea,
+};
+
+/**
+ * Client-facing: change the paint on one surface of a proposal's estimate.
+ * Validates the surface belongs to this proposal, is client-selectable, and that
+ * the new paint is in the SAME category (so a client can't swap to an
+ * off-category/cheaper paint). Persists to the estimate so the accepted proposal,
+ * PDF, and budget all reflect the choice.
+ */
+export async function selectPaintPublic(
+  proposalId: number,
+  ref: PaintSlotRef,
+  paintId: number
+): Promise<ActionResult> {
+  try {
+    if (!ref || !isValidSlotField(ref.kind, ref.field)) {
+      return { success: false, error: "Invalid surface." };
+    }
+    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
+    if (!proposal) return { success: false, error: "Proposal not found." };
+    if (proposal.signedAt) return { success: false, error: "This proposal has already been accepted." };
+
+    const newPaint = await prisma.priceBookItem.findUnique({ where: { id: paintId } });
+    if (!newPaint || newPaint.type !== "paint") return { success: false, error: "Paint not found." };
+    if (!CLIENT_SELECTABLE_CATEGORIES.includes(newPaint.category)) {
+      return { success: false, error: "That paint cannot be selected." };
+    }
+
+    // Reuse the exact slot logic to validate ownership + category match.
+    const [est, catalog, rd] = await Promise.all([
+      prisma.estimate.findUnique({ where: { id: proposal.estimateId }, include: ESTIMATE_INCLUDE }),
+      getPaintCatalog(),
+      getCurrentRatesAndDefaults(),
+    ]);
+    if (!est) return { success: false, error: "Estimate not found." };
+    const slots = extractPaintSlots(toFullEstimateInput(est as any, catalog, rd.defaults), catalog);
+    const slot = slots.find((s) => s.ref.kind === ref.kind && s.ref.id === ref.id && s.ref.field === ref.field);
+    if (!slot) return { success: false, error: "That surface can't be changed." };
+    if (slot.category !== newPaint.category) {
+      return { success: false, error: "Please pick a paint in the same category." };
+    }
+
+    const delegate = SLOT_DELEGATE[ref.kind]();
+    const res = await delegate.updateMany({
+      where: { id: ref.id, estimateId: proposal.estimateId },
+      data: { [ref.field]: paintId },
+    });
+    if (res.count === 0) return { success: false, error: "Surface not found." };
+
+    revalidatePath(`/proposals/${proposalId}/sign`);
+    revalidatePath(`/proposals/${proposalId}`);
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: "Failed to update paint." };
+  }
+}
 
 /** Create a proposal for an estimate, or return the existing one. */
 export async function generateProposal(

@@ -180,14 +180,14 @@ async function main() {
     await prisma.priceBookItem.createMany({
       data: [
         // Paint (unit = gallon, coverage = sq ft per gallon)
-        { type: "paint", name: "Cashmere Interior — Eggshell", brand: "Sherwin-Williams", unit: "gallon", unitCost: 58, markup: 35, coverage: 400, sortOrder: 0 },
-        { type: "paint", name: "Emerald Interior — Matte", brand: "Sherwin-Williams", unit: "gallon", unitCost: 72, markup: 35, coverage: 400, sortOrder: 1 },
-        { type: "paint", name: "Regal Select Interior — Eggshell", brand: "Benjamin Moore", unit: "gallon", unitCost: 64, markup: 35, coverage: 400, sortOrder: 2 },
-        { type: "paint", name: "Aura Interior — Matte", brand: "Benjamin Moore", unit: "gallon", unitCost: 85, markup: 35, coverage: 400, sortOrder: 3 },
-        { type: "paint", name: "ProClassic Trim Enamel", brand: "Sherwin-Williams", unit: "gallon", unitCost: 78, markup: 35, coverage: 400, sortOrder: 4 },
-        { type: "paint", name: "Duration Exterior — Satin", brand: "Sherwin-Williams", unit: "gallon", unitCost: 82, markup: 35, coverage: 350, sortOrder: 5 },
-        { type: "paint", name: "PrepRite ProBlock Primer", brand: "Sherwin-Williams", unit: "gallon", unitCost: 42, markup: 30, coverage: 400, sortOrder: 6 },
-        { type: "paint", name: "SuperDeck Deck Stain", brand: "Sherwin-Williams", unit: "gallon", unitCost: 55, markup: 35, coverage: 200, sortOrder: 7 },
+        { type: "paint", name: "Cashmere Interior — Eggshell", brand: "Sherwin-Williams", unit: "gallon", unitCost: 58, markup: 35, coverage: 400, category: "Interior Wall/Ceiling", sortOrder: 0 },
+        { type: "paint", name: "Emerald Interior — Matte", brand: "Sherwin-Williams", unit: "gallon", unitCost: 72, markup: 35, coverage: 400, category: "Interior Wall/Ceiling", sortOrder: 1 },
+        { type: "paint", name: "Regal Select Interior — Eggshell", brand: "Benjamin Moore", unit: "gallon", unitCost: 64, markup: 35, coverage: 400, category: "Interior Wall/Ceiling", sortOrder: 2 },
+        { type: "paint", name: "Aura Interior — Matte", brand: "Benjamin Moore", unit: "gallon", unitCost: 85, markup: 35, coverage: 400, category: "Interior Wall/Ceiling", sortOrder: 3 },
+        { type: "paint", name: "ProClassic Trim Enamel", brand: "Sherwin-Williams", unit: "gallon", unitCost: 78, markup: 35, coverage: 400, category: "Interior Trim/Door", sortOrder: 4 },
+        { type: "paint", name: "Duration Exterior — Satin", brand: "Sherwin-Williams", unit: "gallon", unitCost: 82, markup: 35, coverage: 350, category: "Exterior", sortOrder: 5 },
+        { type: "paint", name: "PrepRite ProBlock Primer", brand: "Sherwin-Williams", unit: "gallon", unitCost: 42, markup: 30, coverage: 400, category: "Primer", sortOrder: 6 },
+        { type: "paint", name: "SuperDeck Deck Stain", brand: "Sherwin-Williams", unit: "gallon", unitCost: 55, markup: 35, coverage: 200, category: "Deck/Stain", sortOrder: 7 },
         // Materials / supplies
         { type: "material", name: "Plastic Sheeting (.7 mil, 400 sf roll)", brand: "", unit: "roll", unitCost: 12, markup: 40, coverage: 400, sortOrder: 0 },
         { type: "material", name: "Painter's Tape (1.88 in)", brand: "ScotchBlue", unit: "roll", unitCost: 7, markup: 40, coverage: 400, sortOrder: 1 },
