@@ -7,7 +7,8 @@ painting contractor. No authentication. Runs at **http://localhost:3000**.
 
 - **Next.js 16** (App Router, React 19, TypeScript, Turbopack). `params`/`searchParams` are
   **async Promises** — always `await` them in dynamic pages/route handlers.
-- **Prisma 6 + SQLite** (`prisma/dev.db`). Client generated to `@prisma/client`.
+- **Prisma 6 + SQLite**. Datasource url is `env("DATABASE_URL")` — local `file:./dev.db`
+  (→ `prisma/dev.db`), cloud `file:/data/dev.db` (on the Railway volume). Client → `@prisma/client`.
 - **Tailwind CSS v4** + a hand-built design system in `app/globals.css` (dark, glassmorphic,
   emerald accents). Fonts: `DM Serif Display` (headings/brand) + `DM Sans` (body) via
   `next/font/google`.
@@ -20,12 +21,19 @@ painting contractor. No authentication. Runs at **http://localhost:3000**.
 ```bash
 npm run dev        # dev server (localhost:3000)
 npm run build      # production build
-npm run db:seed    # re-run prisma/seed.ts (company, settings, 13 SOPs)
-npm run db:reset   # reset DB + reseed (DESTRUCTIVE)
+npm run start      # serve the production build (local)
+npm run start:prod # cloud start: prisma migrate deploy + db seed + next start
+npm run db:seed    # re-run prisma/seed.ts (company, settings, 13 SOPs) — idempotent
+npm run db:reset   # reset DB + reseed (DESTRUCTIVE — never run against the cloud)
 npx prisma studio  # browse the DB
 ```
 
-After changing `prisma/schema.prisma`: `npx prisma migrate dev --name <name>`.
+After changing `prisma/schema.prisma`: `npx prisma migrate dev --name <name>` (commit the
+new folder in `prisma/migrations/` — Railway applies it on deploy).
+
+**Env vars** (`.env` locally, Railway service vars in cloud; template in `.env.example`):
+`DATABASE_URL` (SQLite path), `APP_PASSWORD` (empty = login OFF; set = login ON),
+`AUTH_SECRET` (login cookie value), `UPLOAD_DIR` (where uploads are written).
 
 ## Directory structure
 
@@ -176,9 +184,12 @@ Editing a Price Book price does not retro-change saved estimates until the estim
 ## Job photos
 
 `EstimatePhoto` (estimateId, url, caption, sortOrder) holds reference photos for an estimate.
-- Files are uploaded via `POST /api/upload` (multipart) which downscales-on-client first, writes to
-  `public/uploads/estimates/`, and returns a `/uploads/...` URL stored in the row. (`public/uploads/`
-  is gitignored except `.gitkeep`.)
+- Files are uploaded via `POST /api/upload` (multipart, downscaled client-side first) and written to
+  `UPLOAD_DIR` (default `./uploads`, cloud `/data/uploads` on the volume). The stored `/uploads/...`
+  URL is served back by **`app/uploads/[...path]/route.ts`** (NOT static `/public`, so local and cloud
+  behave identically). Helpers in `lib/uploads.ts` (`UPLOAD_DIR`, `resolveUploadPath`,
+  path-traversal guard). Logos use the same route via the `branding` folder; `proposalPdf.ts` reads
+  images through `resolveUploadPath`. `uploads/` is gitignored (data lives on the cloud volume).
 - Managed in the estimate builder's **Photos** tab (add/caption/reorder/delete); persisted by
   `saveEstimate` (delete+recreate like other children). Photos live on the estimate so they appear
   automatically on the **proposal detail** (read-only gallery) and the **client sign page**
@@ -207,6 +218,27 @@ Lets the owner draft a proposal email **into their Zoho mailbox** (review & send
   returned `{storeName, attachmentName, attachmentPath}` in the draft's `attachments` array.
   `pdfkit` is in `serverExternalPackages` (next.config) so its bundled font files load at runtime.
   If PDF/upload fails, the draft is still created (text only) and the UI says to attach manually.
+
+## Cloud deployment (Railway) + auth
+
+The app is single-user localhost by default but is **cloud-deployable to Railway** so the owner
+can use it on a phone with the PC off (see `DEPLOY.md` for the click-by-click guide). Design:
+- **Persistence:** keeps SQLite — a Railway **volume** mounted at `/data` holds both the DB
+  (`DATABASE_URL=file:/data/dev.db`) and uploads (`UPLOAD_DIR=/data/uploads`). Redeploys never
+  touch the volume; `start:prod` runs `prisma migrate deploy` (applies new migrations, no reset) then
+  the **idempotent** seed (singletons via `upsert {update:{}}`; lists only seed when empty — safe to
+  run every deploy) then `next start`. `postinstall` runs `prisma generate`. `tsx` is a runtime dep
+  (seed runs at startup).
+- **Auth:** `middleware.ts` gates the back office. **OFF when `APP_PASSWORD` is empty** (local default),
+  **ON when set** (cloud). Public without login: `/login`, `/uploads/*`, `/_next/*`, and
+  `/proposals/<id>/sign` (clients must reach + e-sign without an account). Login (`lib/actions/auth.ts`)
+  checks the password, sets an httpOnly cookie `acres_session` = `AUTH_SECRET`; middleware compares it.
+  Env is read at **runtime** (verified), so setting vars on Railway works without rebuild. Sidebar shows
+  a "Sign out" button only when auth is enabled (`authEnabled()` passed from the backoffice layout).
+- **Config:** `railway.json` (NIXPACKS, `startCommand: npm run start:prod`); `next.config.ts`
+  `serverActions.allowedOrigins` includes `*.up.railway.app`. Code lives in git (branch `main`),
+  pushed to a private GitHub repo; **deploy = git push** (Railway auto-builds).
+- **Local vs cloud are separate databases** by design (dev sandbox vs. real data).
 
 ## Conventions
 
