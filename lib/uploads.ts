@@ -14,7 +14,7 @@ export const UPLOAD_DIR = process.env.UPLOAD_DIR
   : path.join(process.cwd(), "uploads");
 
 /** Allowed upload sub-folders (prevents writing outside the upload root). */
-export const UPLOAD_FOLDERS = new Set(["estimates", "branding"]);
+export const UPLOAD_FOLDERS = new Set(["estimates", "branding", "resources"]);
 
 /**
  * Map a stored URL like "/uploads/branding/abc.png" to an absolute filesystem

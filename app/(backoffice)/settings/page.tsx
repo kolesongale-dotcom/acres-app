@@ -46,6 +46,8 @@ export default async function SettingsPage() {
     maxDepositDiscount: business?.maxDepositDiscount ?? 6,
     publicBaseUrl: business?.publicBaseUrl ?? "",
     proposalEmailTemplate: business?.proposalEmailTemplate ?? "",
+    resourceInteriorUrl: business?.resourceInteriorUrl ?? "",
+    resourceExteriorUrl: business?.resourceExteriorUrl ?? "",
   };
 
   return (

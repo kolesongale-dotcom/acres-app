@@ -33,6 +33,10 @@ model BusinessSettings {
   maxDepositDiscount    Float  @default(6)
   publicBaseUrl         String @default("")
   proposalEmailTemplate String @default("Thank you for the opportunity to provide this estimate. Please find your proposal attached. We look forward to working with you.\n\nBest,\nAcres Painting Co.")
+  // "Helpful Resources" reference charts shown (as click-to-open pop-ups) on the
+  // client proposal page. Uploaded in Settings; blank = hidden.
+  resourceInteriorUrl   String @default("")
+  resourceExteriorUrl   String @default("")
 }
 
 model Customer {

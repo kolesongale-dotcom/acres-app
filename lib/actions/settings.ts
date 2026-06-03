@@ -37,6 +37,8 @@ export async function updateBusinessSettings(input: {
   maxDepositPercent: number;
   maxDepositDiscount: number;
   publicBaseUrl: string;
+  resourceInteriorUrl?: string;
+  resourceExteriorUrl?: string;
 }): Promise<ActionResult> {
   try {
     const clean = { ...input, publicBaseUrl: input.publicBaseUrl.trim() };

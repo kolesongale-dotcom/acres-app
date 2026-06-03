@@ -243,6 +243,15 @@ Lets the owner draft a proposal email **into their Zoho mailbox** (review & send
   `pdfkit` is in `serverExternalPackages` (next.config) so its bundled font files load at runtime.
   If PDF/upload fails, the draft is still created (text only) and the UI says to attach manually.
 
+## Helpful Resources (client proposal pop-ups)
+
+`BusinessSettings.resourceInteriorUrl` / `resourceExteriorUrl` hold two reference-chart images
+(uploaded in **Settings → Business Settings → Helpful Resources**, stored in the `resources` upload
+folder). On the client sign page (`SignFlow.tsx`), a **"Helpful Resources → Choosing a Paint Line"**
+section shows **Interior/Exterior Paint Lines** as underlined links that open the chart in a
+**lightbox** (portaled to `document.body`, Esc/✕/click-outside to close — no navigation). The section
+and each link auto-hide when its URL is blank. Passed from the sign `page.tsx` as the `resources` prop.
+
 ## Cloud deployment (Railway) + auth
 
 The app is single-user localhost by default but is **cloud-deployable to Railway** so the owner

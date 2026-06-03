@@ -48,6 +48,8 @@ export interface Business {
   midDepositPercent: number; midDepositDiscount: number; maxDepositPercent: number; maxDepositDiscount: number;
   publicBaseUrl: string;
   proposalEmailTemplate: string;
+  resourceInteriorUrl: string;
+  resourceExteriorUrl: string;
 }
 export interface Procedure {
   id: number; category: string; title: string; description: string; isDefault: boolean; sortOrder: number;
@@ -426,6 +428,18 @@ function BusinessTab({ business }: { business: Business }) {
         Leave blank to send the PDF only. Example: <code style={{ color: "var(--accent)" }}>https://acres.example.com</code>
       </p>
       <F label="Public Base URL"><input className="input" placeholder="https://…" value={form.publicBaseUrl} onChange={(e) => str("publicBaseUrl", e.target.value)} /></F>
+
+      <hr className="divider" style={{ margin: "20px 0" }} />
+      <h3 className="section-title" style={{ marginBottom: 6 }}>Helpful Resources</h3>
+      <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 0, marginBottom: 14 }}>
+        Reference charts clients can open as a pop-up on their proposal, under &ldquo;Choosing a Paint Line.&rdquo;
+        Upload an image for each. Leave blank to hide that link.
+      </p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <ResourceUploadRow label="Interior Paint Lines chart" value={form.resourceInteriorUrl} onChange={(url) => str("resourceInteriorUrl", url)} />
+        <ResourceUploadRow label="Exterior Paint Lines chart" value={form.resourceExteriorUrl} onChange={(url) => str("resourceExteriorUrl", url)} />
+      </div>
+
       <div style={{ marginTop: 20 }}>
         <button className="btn btn-primary" disabled={pending} onClick={() => start(async () => {
           const { proposalEmailTemplate, ...rest } = form;
@@ -618,6 +632,51 @@ function ProcedureRow({ p, first, last, onDelete }: { p: Procedure; first: boole
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ResourceUploadRow({ label, value, onChange }: { label: string; value: string; onChange: (url: string) => void }) {
+  const { success, error } = useToast();
+  const [uploading, setUploading] = useState(false);
+
+  async function upload(file: File | null | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { error("Please choose an image file."); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file, file.name);
+      fd.append("folder", "resources");
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.url) { onChange(data.url); success(`${label} uploaded — click Save Settings to keep it.`); }
+      else error(data.error || "Upload failed.");
+    } catch {
+      error("Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+      {value ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={value} alt={label} style={{ height: 64, maxWidth: 220, objectFit: "contain", background: "var(--bg-secondary)", border: "1px solid var(--border-light)", borderRadius: 8, padding: 6 }} />
+      ) : (
+        <div style={{ height: 64, width: 120, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11.5, color: "var(--text-dim)", background: "var(--bg-secondary)", border: "1px dashed var(--border-light)", borderRadius: 8 }}>No image</div>
+      )}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--text-primary)" }}>{label}</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <label className="btn btn-secondary btn-sm" style={{ cursor: uploading ? "wait" : "pointer" }}>
+            {uploading ? <LoadingSpinner size={14} /> : value ? "Replace…" : "Upload…"}
+            <input type="file" accept="image/*" style={{ display: "none" }} disabled={uploading} onChange={(e) => { upload(e.target.files?.[0]); e.target.value = ""; }} />
+          </label>
+          {value && <button type="button" className="btn btn-ghost btn-sm" onClick={() => onChange("")}>Remove</button>}
+        </div>
+      </div>
     </div>
   );
 }

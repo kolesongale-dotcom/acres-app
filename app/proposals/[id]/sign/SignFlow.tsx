@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import {
   computeAll, calcTiers, formatCurrency,
   type FullEstimateInput, type TierSettings, type PaintCatalog,
@@ -14,6 +15,7 @@ export default function SignFlow({
   tierSettings,
   initialTier,
   accent,
+  resources,
   children,
 }: {
   proposalId: number;
@@ -21,8 +23,18 @@ export default function SignFlow({
   tierSettings: TierSettings;
   initialTier: string;
   accent: string;
+  resources?: { interior: string; exterior: string };
   children?: React.ReactNode; // static sections (photos, notes, SOPs, terms)
 }) {
+  const [lightbox, setLightbox] = useState<{ src: string; title: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    if (!lightbox) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setLightbox(null); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [lightbox]);
   const [input, setInput] = useState<FullEstimateInput>(initialInput);
   const [tier, setTier] = useState(initialTier);
   const [name, setName] = useState("");
@@ -211,8 +223,51 @@ export default function SignFlow({
         </>
       )}
 
+      {/* Helpful Resources (click-to-open reference charts) */}
+      {(resources?.interior || resources?.exterior) && (
+        <>
+          <h3 style={{ ...sectionStyle, marginTop: 36 }}>Helpful Resources</h3>
+          <div style={{ background: "#fff", borderRadius: 14, padding: 20, border: "1px solid #e2e8f0" }}>
+            <div style={{ fontWeight: 700, color: "#0f172a", fontSize: 15.5 }}>Choosing a Paint Line</div>
+            <p style={{ marginTop: 4, marginBottom: 14, color: "#475569", fontSize: 14 }}>
+              Compare paint lines to help decide what&apos;s right for your project.
+            </p>
+            <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
+              {resources?.interior && (
+                <button type="button" onClick={() => setLightbox({ src: resources.interior, title: "Interior Paint Lines" })} style={resourceLink(accent)}>
+                  🔍 Interior Paint Lines
+                </button>
+              )}
+              {resources?.exterior && (
+                <button type="button" onClick={() => setLightbox({ src: resources.exterior, title: "Exterior Paint Lines" })} style={resourceLink(accent)}>
+                  🔍 Exterior Paint Lines
+                </button>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* Static sections (photos, notes, SOPs, terms) */}
       {children}
+
+      {/* Lightbox pop-up (portaled to body so it always centers on the viewport) */}
+      {mounted && lightbox && createPortal(
+        <div
+          onClick={() => setLightbox(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.82)", display: "grid", placeItems: "center", padding: 20, zIndex: 1000 }}
+        >
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, padding: 14, maxWidth: "min(980px, 96vw)", maxHeight: "92vh", overflow: "auto", boxShadow: "0 24px 60px -16px rgba(0,0,0,0.6)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: "#0f172a" }}>{lightbox.title}</div>
+              <button onClick={() => setLightbox(null)} aria-label="Close" style={{ background: "none", border: "none", fontSize: 22, lineHeight: 1, cursor: "pointer", color: "#64748b" }}>✕</button>
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={lightbox.src} alt={lightbox.title} style={{ width: "100%", height: "auto", borderRadius: 8, display: "block" }} />
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Pricing tiers */}
       <h3 style={{ ...sectionStyle, marginTop: 36 }}>Choose Your Pricing Option</h3>
@@ -280,3 +335,7 @@ const sectionStyle: React.CSSProperties = {
 const ghostBtn: React.CSSProperties = {
   background: "transparent", border: "none", color: "#64748b", fontSize: 13.5, fontWeight: 600, cursor: "pointer", padding: "6px 10px",
 };
+const resourceLink = (accent: string): React.CSSProperties => ({
+  background: "none", border: "none", color: accent, fontSize: 15, fontWeight: 700,
+  cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 3, padding: 0,
+});

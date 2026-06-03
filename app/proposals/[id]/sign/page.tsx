@@ -149,6 +149,10 @@ export default async function SignPage({
             tierSettings={tierSettings}
             initialTier={proposal.selectedTier}
             accent={ACCENT}
+            resources={{
+              interior: settings?.resourceInteriorUrl ?? "",
+              exterior: settings?.resourceExteriorUrl ?? "",
+            }}
           >
             {proposal.estimate.photos.length > 0 && (
               <Section title="Project Photos">
