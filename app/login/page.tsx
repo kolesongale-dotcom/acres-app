@@ -33,7 +33,7 @@ export default async function LoginPage({
             Painting Co.
           </div>
         </div>
-        <LoginForm next={next ?? "/"} />
+        <LoginForm next={next ?? "/dashboard"} />
       </div>
     </div>
   );

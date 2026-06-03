@@ -19,7 +19,7 @@ export async function login(
   if (!password) redirect("/");
 
   const entered = String(formData.get("password") || "");
-  const next = String(formData.get("next") || "/");
+  const next = String(formData.get("next") || "/dashboard");
 
   if (entered !== password) {
     return "Incorrect password.";
@@ -36,7 +36,7 @@ export async function login(
   });
 
   // Only allow same-site relative redirects.
-  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard");
 }
 
 /** Clear the session cookie and return to the login screen. */
