@@ -1,0 +1,505 @@
+datasource db {
+  provider = "sqlite"
+  // Local dev reads this from .env (file:./dev.db -> prisma/dev.db). In the cloud
+  // (Railway) DATABASE_URL points at the SQLite file on the persistent volume,
+  // e.g. file:/data/dev.db.
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model CompanyProfile {
+  id      Int    @id @default(1)
+  name    String @default("Acres Painting Co.")
+  email   String @default("")
+  phone   String @default("")
+  address String @default("")
+  website String @default("")
+  tagline String @default("")
+  logoUrl String @default("")
+}
+
+model BusinessSettings {
+  id                    Int    @id @default(1)
+  globalTaxRate         Float  @default(0)
+  globalMarkupDefault   Float  @default(30)
+  standardTerms         String @default("")
+  standardExclusions    String @default("")
+  midDepositPercent     Float  @default(15)
+  midDepositDiscount    Float  @default(3)
+  maxDepositPercent     Float  @default(30)
+  maxDepositDiscount    Float  @default(6)
+  publicBaseUrl         String @default("")
+  proposalEmailTemplate String @default("Thank you for the opportunity to provide this estimate. Please find your proposal attached. We look forward to working with you.\n\nBest,\nAcres Painting Co.")
+}
+
+model Customer {
+  id             Int                @id @default(autoincrement())
+  customerNumber String             @unique
+  firstName      String
+  lastName       String
+  company        String             @default("")
+  email          String             @default("")
+  phone          String             @default("")
+  street         String             @default("")
+  city           String             @default("")
+  state          String             @default("PA")
+  zip            String             @default("")
+  leadSource     String             @default("Unknown")
+  status         String             @default("lead")
+  notes          String             @default("")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  estimates      Estimate[]
+  followUps      FollowUpReminder[]
+}
+
+model FollowUpReminder {
+  id         Int       @id @default(autoincrement())
+  customerId Int
+  estimateId Int?
+  dueDate    DateTime
+  note       String    @default("")
+  completed  Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  estimate   Estimate? @relation(fields: [estimateId], references: [id], onDelete: SetNull)
+}
+
+model Estimate {
+  id               Int                  @id @default(autoincrement())
+  estimateNumber   String               @unique
+  projectName      String               @default("")
+  customerId       Int?
+  street           String               @default("")
+  city             String               @default("")
+  state            String               @default("PA")
+  zip              String               @default("")
+  status           String               @default("Draft")
+  startDate        DateTime?
+  endDate          DateTime?
+  durationDays     Int                  @default(1)
+  globalWallRate   Float                @default(0.65)
+  globalCeilRate   Float                @default(0.45)
+  globalTrimRate   Float                @default(0.30)
+  globalMarkup     Float                @default(30)
+  taxRate          Float                @default(0)
+  discountType     String               @default("none")
+  discountValue    Float                @default(0)
+  ratesSnapshot    String               @default("")
+  notes            String               @default("")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  customer         Customer?            @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lineItems        EstimateLineItem[]
+  rooms            Room[]
+  cabinetSets      CabinetSet[]
+  deckAreas        DeckArea[]
+  exteriorHouses   ExteriorHouse[]
+  exteriorDoors    ExteriorDoor[]
+  exteriorShutters ExteriorShutter[]
+  garageDoors      ExteriorGarageDoor[]
+  overheadItems    OverheadItem[]
+  customAreas      CustomArea[]
+  photos           EstimatePhoto[]
+  followUps        FollowUpReminder[]
+  proposal         Proposal?
+}
+
+// Job photos with captions. Shown on the estimate, proposal, and client sign page.
+model EstimatePhoto {
+  id         Int      @id @default(autoincrement())
+  estimateId Int
+  url        String
+  caption    String   @default("")
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model EstimateLineItem {
+  id              Int      @id @default(autoincrement())
+  estimateId      Int
+  description     String
+  category        String   @default("Labor")
+  quantity        Float    @default(1)
+  unitCost        Float    @default(0)
+  markup          Float    @default(0)
+  taxable         Boolean  @default(true)
+  unit            String   @default("")
+  priceBookItemId Int?
+  sortOrder       Int      @default(0)
+  estimate        Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model Room {
+  id             Int             @id @default(autoincrement())
+  estimateId     Int
+  name           String          @default("Room")
+  length         Float           @default(0)
+  width          Float           @default(0)
+  height         Float           @default(0)
+  paintWalls     Boolean         @default(true)
+  paintCeiling   Boolean         @default(false)
+  paintTrim      Boolean         @default(false)
+  wallCoats      Int             @default(2)
+  ceilingCoats   Int             @default(1)
+  trimCoats      Int             @default(2)
+  wallRate       Float?
+  ceilingRate    Float?
+  trimRate       Float?
+  wallProduct    String          @default("")
+  ceilingProduct String          @default("")
+  trimProduct    String          @default("")
+  wallPaintId    Int?
+  ceilingPaintId Int?
+  trimPaintId    Int?
+  trimLinearFt   Float?
+  wallSqftAdjust    Float        @default(0)
+  ceilingSqftAdjust Float        @default(0)
+  trimLfAdjust      Float        @default(0)
+  wallPrimerPaintId    Int?
+  wallPrimerCoats      Int        @default(1)
+  wallPrimerSqftAdjust Float      @default(0)
+  ceilingPrimerPaintId    Int?
+  ceilingPrimerCoats      Int     @default(1)
+  ceilingPrimerSqftAdjust Float   @default(0)
+  trimPrimerPaintId    Int?
+  trimPrimerCoats      Int        @default(1)
+  trimPrimerSqftAdjust Float      @default(0)
+  materials      String          @default("[]")
+  sortOrder      Int             @default(0)
+  estimate       Estimate        @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  deductions     RoomDeduction[]
+  accentWalls    AccentWall[]
+}
+
+model RoomDeduction {
+  id          Int     @id @default(autoincrement())
+  roomId      Int
+  label       String  @default("Window")
+  kind        String  @default("window") // "door" | "window" | "custom"
+  width       Float   @default(0)
+  height      Float   @default(0)
+  includeTrim Boolean @default(false)
+  room        Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model AccentWall {
+  id      Int    @id @default(autoincrement())
+  roomId  Int
+  label   String @default("Accent Wall")
+  length  Float  @default(0)
+  height  Float  @default(0)
+  coats   Int    @default(2)
+  product String @default("")
+  paintId Int?
+  room    Room   @relation(fields: [roomId], references: [id], onDelete: Cascade)
+}
+
+model CabinetSet {
+  id            Int      @id @default(autoincrement())
+  estimateId    Int
+  name          String   @default("Cabinet Set")
+  doorCount     Int      @default(0)
+  drawerCount   Int      @default(0)
+  frameCount    Int      @default(0)
+  doorRate      Float    @default(0)
+  drawerRate    Float    @default(0)
+  frameRate     Float    @default(0)
+  coats         Int      @default(2)
+  primerCoats   Int      @default(1)
+  primerProduct String   @default("")
+  paintProduct  String   @default("")
+  paintGallons  Float    @default(0)
+  laborRate     Float    @default(0)
+  paintId       Int?
+  primerId      Int?
+  materials     String   @default("[]")
+  sortOrder     Int      @default(0)
+  estimate      Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model DeckArea {
+  id            Int      @id @default(autoincrement())
+  estimateId    Int
+  name          String   @default("Deck")
+  floorLength   Float    @default(0)
+  floorWidth    Float    @default(0)
+  floorSqFt     Float?
+  railingLinFt  Float    @default(0)
+  stepCount     Int      @default(0)
+  latticeSqFt   Float    @default(0)
+  floorRate     Float    @default(0)
+  railingRate   Float    @default(0)
+  stepRate      Float    @default(0)
+  latticeRate   Float    @default(0)
+  coats         Int      @default(2)
+  includeRailing Boolean @default(true)
+  includeLattice Boolean @default(true)
+  powerWashCost Float    @default(0)
+  woodReplCost  Float    @default(0)
+  stainProduct  String   @default("")
+  stainId       Int?
+  floorStainId  Int?
+  railStainId   Int?
+  primerPaintId    Int?
+  primerCoats      Int    @default(1)
+  primerSqftAdjust Float  @default(0)
+  materials     String   @default("[]")
+  laborRate     Float    @default(0)
+  sortOrder     Int      @default(0)
+  estimate      Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model ExteriorHouse {
+  id             Int                   @id @default(autoincrement())
+  estimateId     Int
+  name           String                @default("Exterior")
+  sidingLength   Float                 @default(0)
+  sidingWidth    Float                 @default(0)
+  sidingHeight   Float                 @default(0)
+  sidingMaterial String                @default("Vinyl")
+  sidingSqFt     Float?
+  sidingSqftAdjust Float               @default(0)
+  coats          Int                   @default(2)
+  powerWashRate  Float                 @default(0)
+  laborRate      Float                 @default(0)
+  paintProduct   String                @default("")
+  paintId        Int?
+  primerPaintId    Int?
+  primerCoats      Int                 @default(1)
+  primerSqftAdjust Float               @default(0)
+  materials      String                @default("[]")
+  sortOrder      Int                   @default(0)
+  estimate       Estimate              @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  deductions     ExteriorDeduction[]
+  replacements   ExteriorReplacement[]
+}
+
+model ExteriorDeduction {
+  id              Int           @id @default(autoincrement())
+  exteriorHouseId Int
+  label           String        @default("Window")
+  width           Float         @default(0)
+  height          Float         @default(0)
+  exteriorHouse   ExteriorHouse @relation(fields: [exteriorHouseId], references: [id], onDelete: Cascade)
+}
+
+model ExteriorReplacement {
+  id              Int           @id @default(autoincrement())
+  exteriorHouseId Int
+  description     String        @default("")
+  cost            Float         @default(0)
+  exteriorHouse   ExteriorHouse @relation(fields: [exteriorHouseId], references: [id], onDelete: Cascade)
+}
+
+model ExteriorDoor {
+  id           Int      @id @default(autoincrement())
+  estimateId   Int
+  name         String   @default("Door")
+  count        Int      @default(1)
+  width        Float    @default(3)
+  height       Float    @default(7)
+  paintedSides Int      @default(1)
+  coats        Int      @default(2)
+  ratePerSqFt  Float    @default(0)
+  ratePerDoor  Float    @default(0)
+  paintProduct String   @default("")
+  paintId      Int?
+  primerPaintId    Int?
+  primerCoats      Int  @default(1)
+  primerSqftAdjust Float @default(0)
+  materials    String   @default("[]")
+  sortOrder    Int      @default(0)
+  estimate     Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model ExteriorShutter {
+  id             Int      @id @default(autoincrement())
+  estimateId     Int
+  name           String   @default("House Shutters")
+  count          Int      @default(1)
+  width          Float    @default(1.25)
+  height         Float    @default(5)
+  story1         Int      @default(0)
+  story2         Int      @default(0)
+  story3         Int      @default(0)
+  customQty      Int      @default(0)
+  customRate     Float    @default(0)
+  coats          Int      @default(2)
+  ratePerSqFt    Float    @default(0)
+  ratePerShutter Float    @default(0)
+  paintProduct   String   @default("")
+  paintId        Int?
+  primerPaintId    Int?
+  primerCoats      Int    @default(1)
+  primerSqftAdjust Float  @default(0)
+  materials      String   @default("[]")
+  sortOrder      Int      @default(0)
+  estimate       Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model ExteriorGarageDoor {
+  id           Int      @id @default(autoincrement())
+  estimateId   Int
+  name         String   @default("Garage Door")
+  count        Int      @default(1)
+  width        Float    @default(9)
+  height       Float    @default(7)
+  coats        Int      @default(2)
+  ratePerSqFt  Float    @default(0)
+  ratePerDoor  Float    @default(0)
+  paintProduct String   @default("")
+  paintId      Int?
+  primerPaintId    Int?
+  primerCoats      Int  @default(1)
+  primerSqftAdjust Float @default(0)
+  materials    String   @default("[]")
+  sortOrder    Int      @default(0)
+  estimate     Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model OverheadItem {
+  id          Int      @id @default(autoincrement())
+  estimateId  Int
+  description String
+  cost        Float    @default(0)
+  markup      Float    @default(0)
+  sortOrder   Int      @default(0)
+  estimate    Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+// Irregular / manually-entered areas that aren't a simple rectangle.
+// measureType: "area" (sq ft) or "trim" (linear ft, divided by 2 for paint).
+model CustomArea {
+  id           Int      @id @default(autoincrement())
+  estimateId   Int
+  label        String   @default("Custom Area")
+  measureType  String   @default("area")
+  amount       Float    @default(0)
+  rate         Float    @default(0)
+  coats        Int      @default(2)
+  paintProduct String   @default("")
+  paintId      Int?
+  primerPaintId    Int?
+  primerCoats      Int  @default(1)
+  primerSqftAdjust Float @default(0)
+  materials    String   @default("[]")
+  sortOrder    Int      @default(0)
+  estimate     Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+// Reusable pricing for Paint and Materials/Supplies. Each item stores the
+// owner's actual cost plus a per-item markup percentage (markup varies by item).
+// For paint, `coverage` is sq ft per gallon (default 400) and unit is "gallon".
+model PriceBookItem {
+  id        Int      @id @default(autoincrement())
+  type      String   @default("material") // "paint" | "material"
+  name      String
+  brand     String   @default("")
+  unit      String   @default("each")
+  unitCost  Float    @default(0)
+  markup    Float    @default(30)
+  coverage  Float    @default(400)
+  notes     String   @default("")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Proposal {
+  id             Int       @id @default(autoincrement())
+  proposalNumber String    @unique
+  estimateId     Int       @unique
+  status         String    @default("Draft")
+  selectedTier   String    @default("full")
+  customNotes    String    @default("")
+  includedSOPs   String    @default("[]")
+  signatureData  String    @default("")
+  signatureName  String    @default("")
+  signedAt       DateTime?
+  sentAt         DateTime?
+  viewedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  estimate       Estimate  @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+}
+
+model ProcedureTemplate {
+  id          Int     @id @default(autoincrement())
+  category    String  @default("General")
+  title       String
+  description String
+  isDefault   Boolean @default(false)
+  sortOrder   Int     @default(0)
+}
+
+// Master labor rates + default paint/stain selections. Edited in Settings → Job
+// Rates. Each estimate captures a snapshot of the rate values (Estimate.ratesSnapshot).
+model JobRateSettings {
+  id                  Int      @id @default(1)
+  wallRate            Float    @default(0.65)
+  ceilingRate         Float    @default(0.45)
+  trimRate            Float    @default(1.5)
+  cabinetDoorRate     Float    @default(45)
+  cabinetDrawerRate   Float    @default(25)
+  cabinetFrameRate    Float    @default(60)
+  deckFloorRate       Float    @default(2.5)
+  deckRailingRate     Float    @default(3)
+  deckStepRate        Float    @default(12)
+  deckLatticeRate     Float    @default(2)
+  sidingRate          Float    @default(1.5)
+  powerWashRate       Float    @default(0.15)
+  doorRate            Float    @default(2.5)
+  shutterStory1Rate   Float    @default(35)
+  shutterStory2Rate   Float    @default(45)
+  shutterStory3Rate   Float    @default(55)
+  shutterSqFtEach     Float    @default(6)
+  garageRate          Float    @default(2)
+  primerRate          Float    @default(0.5)
+  laborMarkup         Float    @default(30)
+  defaultWallPaintId      Int?
+  defaultCeilingPaintId   Int?
+  defaultTrimPaintId      Int?
+  defaultDeckFloorStainId Int?
+  defaultDeckRailStainId  Int?
+  defaultSidingPaintId    Int?
+  defaultDoorPaintId      Int?
+  defaultShutterPaintId   Int?
+  defaultGaragePaintId    Int?
+  updatedAt           DateTime @updatedAt
+}
+
+// Zoho Mail integration (single-user, localhost). Stores OAuth credentials so
+// the app can mint access tokens and create drafts in the owner's mailbox.
+model ZohoConfig {
+  id           Int      @id @default(1)
+  region       String   @default("com")
+  clientId     String   @default("")
+  clientSecret String   @default("")
+  refreshToken String   @default("")
+  accountId    String   @default("")
+  fromAddress  String   @default("")
+  connected    Boolean  @default(false)
+  lastError    String   @default("")
+  updatedAt    DateTime @updatedAt
+}
+
+model BudgetEntry {
+  id                    Int      @id @default(autoincrement())
+  estimateId            Int      @unique
+  estimatedRevenue      Float    @default(0)
+  estimatedLaborCost    Float    @default(0)
+  estimatedMaterialCost Float    @default(0)
+  estimatedOverhead     Float    @default(0)
+  actualRevenue         Float    @default(0)
+  actualLaborCost       Float    @default(0)
+  actualMaterialCost    Float    @default(0)
+  actualOverhead        Float    @default(0)
+  notes                 String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
