@@ -17,6 +17,7 @@ import {
   deleteProposal,
 } from "@/lib/actions/proposals";
 import { createZohoDraft } from "@/lib/actions/zoho";
+import { generateInvoice } from "@/lib/actions/invoices";
 import { PROPOSAL_STATUSES } from "@/lib/types";
 import { Totals, TierPricing, formatCurrency } from "@/lib/calculations";
 import { formatDateTime } from "@/lib/format";
@@ -84,6 +85,15 @@ export default function ProposalDetail({
   const [notesDirty, setNotesDirty] = useState(false);
   const [confirm, setConfirm] = useState<null | "Accepted" | "Rejected" | "delete">(null);
   const [copied, setCopied] = useState(false);
+  const [invoiceBusy, setInvoiceBusy] = useState(false);
+
+  async function createInvoice() {
+    setInvoiceBusy(true);
+    const res = await generateInvoice(estimate.id);
+    setInvoiceBusy(false);
+    if (res.success) { if (res.data) router.push(`/invoices/${res.data.id}`); }
+    else error(res.error);
+  }
 
   // Pull the client + project name off the estimate and fill the template's
   // [Client Name] / [Project Name] placeholders so the email is ready to send.
@@ -199,10 +209,15 @@ export default function ProposalDetail({
             <Link href={`/estimates/${estimate.id}`} style={{ color: "var(--text-muted)" }}>{estimate.estimateNumber}</Link>
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <a href={`/proposals/${proposal.id}/sign`} target="_blank" rel="noreferrer" className="btn btn-secondary">
             ↗ View Client Proposal
           </a>
+          {status === "Accepted" && (
+            <button className="btn btn-primary" disabled={invoiceBusy} onClick={createInvoice} title="Create an invoice for this accepted job">
+              {invoiceBusy ? <LoadingSpinner size={16} /> : "🧾 Create Invoice"}
+            </button>
+          )}
           <button className="btn btn-danger" onClick={() => setConfirm("delete")}>Delete</button>
         </div>
       </div>

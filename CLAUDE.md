@@ -263,6 +263,22 @@ dropdown beside each paint picker; `selectSheenPublic` persists it (mapping via 
 `lib/paintSlots.ts`). Sheen is NOT threaded through the calc engine — the sign page passes a
 `sheens` map keyed by the slot key (`buildSheens`).
 
+## Invoices (`/invoices`)
+
+`Invoice` (1—1 with an accepted `Estimate` by unique `estimateId`, **no Prisma relation** — query
+separately, like BudgetEntry) + `Payment` (N per invoice). **Create Invoice** button on an Accepted
+proposal → `generateInvoice(estimateId)` mints `INV-0001`, snapshots the **accepted-tier total**
+(`subtotal` = full grand total, `total` = tier price) + an itemized `lineItemsJson` (the services
+breakdown + overhead) so the invoice is a stable document. Default due date = +14 days (editable).
+- Status is **derived** (`lib/invoiceStatus.ts`): Paid / Partial / Unpaid / Overdue from total vs.
+  sum(payments) vs. due date. No status column.
+- Payments are logged manually (`addPayment`: amount + date + note; supports deposit → balance and
+  extra partials). Paid = Σ payments; remaining = total − paid.
+- PDF: `lib/invoicePdf.ts` (pdfkit, mirrors proposalPdf) at `GET /api/invoices/[id]/pdf`. Zoho:
+  `createZohoInvoiceDraft` (attaches the invoice PDF), mirroring the proposal Zoho flow.
+- Actions in `lib/actions/invoices.ts`. Detail page: line items, payments, due-date + notes editors,
+  ↓ PDF, Draft to Zoho, Delete.
+
 ## Cloud deployment (Railway) + auth
 
 The app is single-user localhost by default but is **cloud-deployable to Railway** so the owner

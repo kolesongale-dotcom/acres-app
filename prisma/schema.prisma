@@ -531,3 +531,32 @@ model BudgetEntry {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 }
+
+// One invoice per accepted job (estimateId unique). Total/line items are
+// snapshotted at creation so the invoice is a stable financial document. No
+// Prisma relation to Estimate (query separately, like BudgetEntry).
+model Invoice {
+  id            Int       @id @default(autoincrement())
+  invoiceNumber String    @unique
+  estimateId    Int       @unique
+  proposalId    Int?
+  tier          String    @default("full")
+  tierLabel     String    @default("")
+  subtotal      Float     @default(0)
+  total         Float     @default(0)
+  lineItemsJson String    @default("[]") // [{name,total}] snapshot for display
+  dueDate       DateTime
+  notes         String    @default("")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  payments      Payment[]
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  invoiceId Int
+  amount    Float    @default(0)
+  paidAt    DateTime @default(now())
+  note      String   @default("")
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}

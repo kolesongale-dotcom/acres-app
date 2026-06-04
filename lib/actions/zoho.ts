@@ -11,6 +11,7 @@ import {
   ZohoAttachment,
 } from "@/lib/zoho";
 import { generateProposalPdf } from "@/lib/proposalPdf";
+import { generateInvoicePdf } from "@/lib/invoicePdf";
 import { revalidatePath } from "next/cache";
 
 async function loadConfig() {
@@ -172,6 +173,70 @@ export async function createZohoDraft(input: {
     } catch (attErr: any) {
       console.error("Proposal PDF attachment failed:", attErr);
       // Continue without the attachment rather than failing the whole draft.
+    }
+
+    await createDraft({
+      region: cfg.region,
+      accessToken: token,
+      accountId: cfg.accountId,
+      fromAddress: cfg.fromAddress,
+      toAddress: input.to.trim(),
+      subject: input.subject,
+      content: input.body,
+      cc: input.cc?.trim() || undefined,
+      attachments,
+    });
+    return { success: true, data: { attached } };
+  } catch (e: any) {
+    console.error(e);
+    return { success: false, error: e?.message ?? "Failed to create Zoho draft." };
+  }
+}
+
+/** Create a draft in the connected Zoho mailbox, attaching the invoice PDF. */
+export async function createZohoInvoiceDraft(input: {
+  invoiceId: number;
+  to: string;
+  subject: string;
+  body: string;
+  cc?: string;
+}): Promise<ActionResult<{ attached: boolean }>> {
+  try {
+    const cfg = await loadConfig();
+    if (!cfg || !cfg.connected || !cfg.refreshToken) {
+      return { success: false, error: "Zoho Mail isn't connected. Set it up in Settings → Zoho Mail." };
+    }
+    if (!cfg.fromAddress) {
+      return { success: false, error: "No Zoho send address configured. Add one in Settings → Zoho Mail." };
+    }
+    if (!input.to.trim()) {
+      return { success: false, error: "This customer has no email address on file." };
+    }
+    const token = await getAccessToken({
+      region: cfg.region,
+      clientId: cfg.clientId,
+      clientSecret: cfg.clientSecret,
+      refreshToken: cfg.refreshToken,
+    });
+
+    const attachments: ZohoAttachment[] = [];
+    let attached = false;
+    try {
+      const pdf = await generateInvoicePdf(input.invoiceId);
+      if (pdf) {
+        const ref = await uploadAttachment({
+          region: cfg.region,
+          accessToken: token,
+          accountId: cfg.accountId,
+          fileName: pdf.filename,
+          bytes: pdf.buffer,
+          contentType: "application/octet-stream",
+        });
+        attachments.push(ref);
+        attached = true;
+      }
+    } catch (attErr: any) {
+      console.error("Invoice PDF attachment failed:", attErr);
     }
 
     await createDraft({
