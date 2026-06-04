@@ -28,6 +28,7 @@ export function blankRoom(): RoomPayload {
     wallCoats: 2, ceilingCoats: 2, trimCoats: 2,
     wallSqftAdjust: 0, ceilingSqftAdjust: 0, trimLfAdjust: 0,
     wallProduct: "", ceilingProduct: "", trimProduct: "",
+    wallSheen: "Unsure", ceilingSheen: "Unsure", trimSheen: "Unsure",
     wallPaintId: null, ceilingPaintId: null, trimPaintId: null,
     wallPrimerPaintId: null, wallPrimerCoats: 1, wallPrimerSqftAdjust: 0,
     ceilingPrimerPaintId: null, ceilingPrimerCoats: 1, ceilingPrimerSqftAdjust: 0,
@@ -36,25 +37,25 @@ export function blankRoom(): RoomPayload {
   };
 }
 export function blankCabinet(): CabinetPayload {
-  return { name: "Cabinet Set", doorCount: 0, drawerCount: 0, frameCount: 0, coats: 2, primerCoats: 1, primerProduct: "", paintProduct: "", paintId: null, primerId: null, materials: [], sortOrder: 0 };
+  return { name: "Cabinet Set", doorCount: 0, drawerCount: 0, frameCount: 0, coats: 2, primerCoats: 1, primerProduct: "", paintProduct: "", sheen: "Unsure", paintId: null, primerId: null, materials: [], sortOrder: 0 };
 }
 export function blankDeck(): DeckPayload {
-  return { name: "Deck", floorLength: 0, floorWidth: 0, includeRailing: true, railingLinFt: 0, stepCount: 0, includeLattice: true, latticeSqFt: 0, coats: 2, powerWashCost: 0, woodReplCost: 0, floorStainId: null, railStainId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
+  return { name: "Deck", floorLength: 0, floorWidth: 0, includeRailing: true, railingLinFt: 0, stepCount: 0, includeLattice: true, latticeSqFt: 0, coats: 2, powerWashCost: 0, woodReplCost: 0, floorSheen: "Unsure", railSheen: "Unsure", floorStainId: null, railStainId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
 }
 export function blankExteriorHouse(): ExteriorHousePayload {
-  return { name: "Exterior", sidingLength: 0, sidingWidth: 0, sidingHeight: 0, sidingSqftAdjust: 0, sidingMaterial: "Vinyl", coats: 2, paintProduct: "", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0, deductions: [], replacements: [] };
+  return { name: "Exterior", sidingLength: 0, sidingWidth: 0, sidingHeight: 0, sidingSqftAdjust: 0, sidingMaterial: "Vinyl", coats: 2, paintProduct: "", sheen: "Unsure", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0, deductions: [], replacements: [] };
 }
 export function blankDoor(): DoorPayload {
-  return { name: "Door", count: 1, width: 3, height: 7, paintedSides: 1, coats: 2, paintProduct: "", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
+  return { name: "Door", count: 1, width: 3, height: 7, paintedSides: 1, coats: 2, paintProduct: "", sheen: "Unsure", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
 }
 export function blankShutter(): ShutterPayload {
-  return { name: "House Shutters", story1: 0, story2: 0, story3: 0, customQty: 0, customRate: 0, coats: 2, paintProduct: "", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
+  return { name: "House Shutters", story1: 0, story2: 0, story3: 0, customQty: 0, customRate: 0, coats: 2, paintProduct: "", sheen: "Unsure", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
 }
 export function blankGarage(): GaragePayload {
-  return { name: "Garage Door", count: 1, width: 16, height: 7, coats: 2, paintProduct: "", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
+  return { name: "Garage Door", count: 1, width: 16, height: 7, coats: 2, paintProduct: "", sheen: "Unsure", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
 }
 export function blankCustomArea(): CustomAreaPayload {
-  return { label: "Custom Area", measureType: "area", amount: 0, rate: 0, coats: 2, paintProduct: "", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
+  return { label: "Custom Area", measureType: "area", amount: 0, rate: 0, coats: 2, paintProduct: "", sheen: "Unsure", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
 }
 export function blankLineItem(): LineItemPayload {
   return { description: "", category: "Material", quantity: 1, unitCost: 0, markup: 0, taxable: true, unit: "", priceBookItemId: null, sortOrder: 0 };

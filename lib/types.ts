@@ -64,6 +64,20 @@ export const CLIENT_SELECTABLE_CATEGORIES: readonly string[] = PAINT_CATEGORIES.
   (c) => c !== "Primer"
 );
 
+// Sheen / finish per painted surface. Purely informational (does NOT affect price)
+// — shown in the builder and on the client proposal. Default "Unsure".
+export const SHEEN_OPTIONS = [
+  "Flat",
+  "Matte",
+  "Eggshell",
+  "Satin",
+  "Semi-gloss",
+  "Gloss",
+  "Unsure",
+] as const;
+export type Sheen = (typeof SHEEN_OPTIONS)[number];
+export const DEFAULT_SHEEN = "Unsure";
+
 export const SIDING_MATERIALS = [
   "Vinyl",
   "Stucco",
@@ -136,6 +150,9 @@ export interface RoomPayload {
   wallProduct: string;
   ceilingProduct: string;
   trimProduct: string;
+  wallSheen: string;
+  ceilingSheen: string;
+  trimSheen: string;
   wallPaintId: number | null;
   ceilingPaintId: number | null;
   trimPaintId: number | null;
@@ -171,6 +188,7 @@ export interface CabinetPayload {
   primerCoats: number;
   primerProduct: string;
   paintProduct: string;
+  sheen: string;
   paintId: number | null;
   primerId: number | null;
   materials: ItemMaterialPayload[];
@@ -190,6 +208,8 @@ export interface DeckPayload {
   coats: number;
   powerWashCost: number;
   woodReplCost: number;
+  floorSheen: string;
+  railSheen: string;
   floorStainId: number | null;
   railStainId: number | null;
   primerPaintId: number | null;
@@ -209,6 +229,7 @@ export interface ExteriorHousePayload {
   sidingMaterial: string;
   coats: number;
   paintProduct: string;
+  sheen: string;
   paintId: number | null;
   primerPaintId: number | null;
   primerCoats: number;
@@ -228,6 +249,7 @@ export interface DoorPayload {
   paintedSides: number;
   coats: number;
   paintProduct: string;
+  sheen: string;
   paintId: number | null;
   primerPaintId: number | null;
   primerCoats: number;
@@ -246,6 +268,7 @@ export interface ShutterPayload {
   customRate: number;
   coats: number;
   paintProduct: string;
+  sheen: string;
   paintId: number | null;
   primerPaintId: number | null;
   primerCoats: number;
@@ -262,6 +285,7 @@ export interface GaragePayload {
   height: number;
   coats: number;
   paintProduct: string;
+  sheen: string;
   paintId: number | null;
   primerPaintId: number | null;
   primerCoats: number;
@@ -278,6 +302,7 @@ export interface CustomAreaPayload {
   rate: number;
   coats: number;
   paintProduct: string;
+  sheen: string;
   paintId: number | null;
   primerPaintId: number | null;
   primerCoats: number;

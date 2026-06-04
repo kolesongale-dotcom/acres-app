@@ -7,7 +7,8 @@ import { ensureBudgetEntry } from "@/lib/actions/estimates";
 import { ESTIMATE_INCLUDE, toFullEstimateInput } from "@/lib/estimateCalc";
 import { getPaintCatalog } from "@/lib/priceCatalog";
 import { getCurrentRatesAndDefaults } from "@/lib/jobRates";
-import { extractPaintSlots, isValidSlotField, type PaintSlotKind, type PaintSlotRef } from "@/lib/paintSlots";
+import { extractPaintSlots, isValidSlotField, sheenFieldFor, type PaintSlotKind, type PaintSlotRef } from "@/lib/paintSlots";
+import { SHEEN_OPTIONS } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 
 // Maps a slot kind to its Prisma model delegate (all have an estimateId column).
@@ -75,6 +76,45 @@ export async function selectPaintPublic(
   } catch (e) {
     console.error(e);
     return { success: false, error: "Failed to update paint." };
+  }
+}
+
+/**
+ * Client-facing: change the sheen/finish on one surface. Informational only (no
+ * price impact). Persists to the matching sheen column on the estimate component.
+ */
+export async function selectSheenPublic(
+  proposalId: number,
+  ref: PaintSlotRef,
+  sheen: string
+): Promise<ActionResult> {
+  try {
+    if (!ref || !isValidSlotField(ref.kind, ref.field)) {
+      return { success: false, error: "Invalid surface." };
+    }
+    if (!SHEEN_OPTIONS.includes(sheen as (typeof SHEEN_OPTIONS)[number])) {
+      return { success: false, error: "Invalid sheen." };
+    }
+    const sheenCol = sheenFieldFor(ref.kind, ref.field);
+    if (!sheenCol) return { success: false, error: "No sheen for this surface." };
+
+    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
+    if (!proposal) return { success: false, error: "Proposal not found." };
+    if (proposal.signedAt) return { success: false, error: "This proposal has already been accepted." };
+
+    const delegate = SLOT_DELEGATE[ref.kind]();
+    const res = await delegate.updateMany({
+      where: { id: ref.id, estimateId: proposal.estimateId },
+      data: { [sheenCol]: sheen },
+    });
+    if (res.count === 0) return { success: false, error: "Surface not found." };
+
+    revalidatePath(`/proposals/${proposalId}/sign`);
+    revalidatePath(`/proposals/${proposalId}`);
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: "Failed to update sheen." };
   }
 }
 

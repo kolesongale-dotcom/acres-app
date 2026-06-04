@@ -157,6 +157,9 @@ model Room {
   wallProduct    String          @default("")
   ceilingProduct String          @default("")
   trimProduct    String          @default("")
+  wallSheen      String          @default("Unsure")
+  ceilingSheen   String          @default("Unsure")
+  trimSheen      String          @default("Unsure")
   wallPaintId    Int?
   ceilingPaintId Int?
   trimPaintId    Int?
@@ -207,6 +210,7 @@ model CabinetSet {
   id            Int      @id @default(autoincrement())
   estimateId    Int
   name          String   @default("Cabinet Set")
+  sheen         String   @default("Unsure")
   doorCount     Int      @default(0)
   drawerCount   Int      @default(0)
   frameCount    Int      @default(0)
@@ -230,6 +234,8 @@ model DeckArea {
   id            Int      @id @default(autoincrement())
   estimateId    Int
   name          String   @default("Deck")
+  floorSheen    String   @default("Unsure")
+  railSheen     String   @default("Unsure")
   floorLength   Float    @default(0)
   floorWidth    Float    @default(0)
   floorSqFt     Float?
@@ -262,6 +268,7 @@ model ExteriorHouse {
   id             Int                   @id @default(autoincrement())
   estimateId     Int
   name           String                @default("Exterior")
+  sheen          String                @default("Unsure")
   sidingLength   Float                 @default(0)
   sidingWidth    Float                 @default(0)
   sidingHeight   Float                 @default(0)
@@ -304,6 +311,7 @@ model ExteriorDoor {
   id           Int      @id @default(autoincrement())
   estimateId   Int
   name         String   @default("Door")
+  sheen        String   @default("Unsure")
   count        Int      @default(1)
   width        Float    @default(3)
   height       Float    @default(7)
@@ -325,6 +333,7 @@ model ExteriorShutter {
   id             Int      @id @default(autoincrement())
   estimateId     Int
   name           String   @default("House Shutters")
+  sheen          String   @default("Unsure")
   count          Int      @default(1)
   width          Float    @default(1.25)
   height         Float    @default(5)
@@ -350,6 +359,7 @@ model ExteriorGarageDoor {
   id           Int      @id @default(autoincrement())
   estimateId   Int
   name         String   @default("Garage Door")
+  sheen        String   @default("Unsure")
   count        Int      @default(1)
   width        Float    @default(9)
   height       Float    @default(7)
@@ -382,6 +392,7 @@ model CustomArea {
   id           Int      @id @default(autoincrement())
   estimateId   Int
   label        String   @default("Custom Area")
+  sheen        String   @default("Unsure")
   measureType  String   @default("area")
   amount       Float    @default(0)
   rate         Float    @default(0)

@@ -252,6 +252,17 @@ section shows **Interior/Exterior Paint Lines** as underlined links that open th
 **lightbox** (portaled to `document.body`, Esc/✕/click-outside to close — no navigation). The section
 and each link auto-hide when its URL is blank. Passed from the sign `page.tsx` as the `resources` prop.
 
+## Sheens (per-surface finish)
+
+Every painted surface stores a **sheen** (`SHEEN_OPTIONS` in `lib/types.ts`: Flat/Matte/Eggshell/
+Satin/Semi-gloss/Gloss/Unsure, default "Unsure"). **Purely informational — never affects price.**
+Columns live on each component model (Room `wallSheen`/`ceilingSheen`/`trimSheen`; CabinetSet,
+ExteriorHouse, ExteriorDoor/Shutter/GarageDoor, CustomArea `sheen`; DeckArea `floorSheen`/`railSheen`).
+A `SheenSelect` sits next to every `PaintSelect` in the builder. On the client proposal the sheen is a
+dropdown beside each paint picker; `selectSheenPublic` persists it (mapping via `sheenFieldFor` in
+`lib/paintSlots.ts`). Sheen is NOT threaded through the calc engine — the sign page passes a
+`sheens` map keyed by the slot key (`buildSheens`).
+
 ## Cloud deployment (Railway) + auth
 
 The app is single-user localhost by default but is **cloud-deployable to Railway** so the owner

@@ -51,6 +51,31 @@ export function isValidSlotField(kind: string, field: string): boolean {
   return !!fields && fields.some((f) => f.field === field);
 }
 
+// Maps a paint slot (kind + paint field) to the matching sheen column on the model.
+const SHEEN_FIELD: Record<string, string> = {
+  "room:wallPaintId": "wallSheen",
+  "room:ceilingPaintId": "ceilingSheen",
+  "room:trimPaintId": "trimSheen",
+  "cabinet:paintId": "sheen",
+  "deck:floorStainId": "floorSheen",
+  "deck:railStainId": "railSheen",
+  "exterior:paintId": "sheen",
+  "door:paintId": "sheen",
+  "shutter:paintId": "sheen",
+  "garage:paintId": "sheen",
+  "custom:paintId": "sheen",
+};
+
+/** The DB sheen column for a given paint slot, or null if none. */
+export function sheenFieldFor(kind: string, field: string): string | null {
+  return SHEEN_FIELD[`${kind}:${field}`] ?? null;
+}
+
+/** Stable key for a slot, matching extractPaintSlots refs: "kind:id:field". */
+export function slotKey(ref: PaintSlotRef): string {
+  return `${ref.kind}:${ref.id}:${ref.field}`;
+}
+
 function collections(input: FullEstimateInput): { kind: PaintSlotKind; items: any[] }[] {
   return [
     { kind: "room", items: input.rooms ?? [] },

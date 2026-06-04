@@ -20,6 +20,27 @@ function parseRecommended(json: string): Record<string, number> {
   }
 }
 
+/** Per-surface sheen keyed by the same "kind:id:field" slot key extractPaintSlots uses. */
+function buildSheens(est: any): Record<string, string> {
+  const m: Record<string, string> = {};
+  for (const r of est.rooms ?? []) {
+    m[`room:${r.id}:wallPaintId`] = r.wallSheen;
+    m[`room:${r.id}:ceilingPaintId`] = r.ceilingSheen;
+    m[`room:${r.id}:trimPaintId`] = r.trimSheen;
+  }
+  for (const c of est.cabinetSets ?? []) m[`cabinet:${c.id}:paintId`] = c.sheen;
+  for (const d of est.deckAreas ?? []) {
+    m[`deck:${d.id}:floorStainId`] = d.floorSheen;
+    m[`deck:${d.id}:railStainId`] = d.railSheen;
+  }
+  for (const h of est.exteriorHouses ?? []) m[`exterior:${h.id}:paintId`] = h.sheen;
+  for (const d of est.exteriorDoors ?? []) m[`door:${d.id}:paintId`] = d.sheen;
+  for (const s of est.exteriorShutters ?? []) m[`shutter:${s.id}:paintId`] = s.sheen;
+  for (const g of est.garageDoors ?? []) m[`garage:${g.id}:paintId`] = g.sheen;
+  for (const c of est.customAreas ?? []) m[`custom:${c.id}:paintId`] = c.sheen;
+  return m;
+}
+
 export default async function SignPage({
   params,
 }: {
@@ -163,6 +184,7 @@ export default async function SignPage({
               exterior: settings?.resourceExteriorUrl ?? "",
             }}
             recommended={parseRecommended(proposal.recommendedPaints)}
+            sheens={buildSheens(proposal.estimate)}
           >
             {proposal.estimate.photos.length > 0 && (
               <Section title="Project Photos">

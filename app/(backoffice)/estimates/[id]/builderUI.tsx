@@ -1,8 +1,20 @@
 "use client";
 
 import { ReactNode } from "react";
+import { SHEEN_OPTIONS } from "@/lib/types";
 
 /** Small shared form primitives for the estimate builder. */
+
+/** Sheen / finish dropdown (informational — does not affect price). */
+export function SheenSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <select className="select" value={value || "Unsure"} onChange={(e) => onChange(e.target.value)}>
+      {SHEEN_OPTIONS.map((s) => (
+        <option key={s} value={s}>{s}</option>
+      ))}
+    </select>
+  );
+}
 
 export function Labeled({
   label,

@@ -15,7 +15,7 @@ import {
   BuilderState, buildCalcInput, blankRoom, blankCabinet, blankDeck, blankExteriorHouse,
   blankDoor, blankShutter, blankGarage, blankCustomArea, blankLineItem, blankOverhead, blankMaterial,
 } from "@/lib/builderState";
-import { Labeled, NumberField, TextField, Toggle, CardHeader, PaintSelect, PaintOption } from "./builderUI";
+import { Labeled, NumberField, TextField, Toggle, CardHeader, PaintSelect, PaintOption, SheenSelect } from "./builderUI";
 
 interface CustomerOption { id: number; label: string }
 interface TierConfig { midDepositPercent: number; midDepositDiscount: number; maxDepositPercent: number; maxDepositDiscount: number }
@@ -271,11 +271,11 @@ export default function EstimateBuilder({
                       <Labeled label="Manual Trim LF (+/-)"><NumberField value={room.trimLfAdjust} onChange={(v) => roomOps.update(i, { trimLfAdjust: v })} /></Labeled>
                     </div>
                     <div style={{ display: "flex", gap: 16, margin: "16px 0", flexWrap: "wrap" }}>
-                      <SurfaceControl label="Walls" on={room.paintWalls} onToggle={(v) => roomOps.update(i, { paintWalls: v })} coats={room.wallCoats} onCoats={(v) => roomOps.update(i, { wallCoats: v })} paintId={room.wallPaintId} onPaint={(id, name) => roomOps.update(i, { wallPaintId: id, wallProduct: name })} paintOptions={paintItems}
+                      <SurfaceControl label="Walls" on={room.paintWalls} onToggle={(v) => roomOps.update(i, { paintWalls: v })} coats={room.wallCoats} onCoats={(v) => roomOps.update(i, { wallCoats: v })} paintId={room.wallPaintId} onPaint={(id, name) => roomOps.update(i, { wallPaintId: id, wallProduct: name })} paintOptions={paintItems} sheen={room.wallSheen} onSheen={(v) => roomOps.update(i, { wallSheen: v })}
                         primerPaintId={room.wallPrimerPaintId} primerCoats={room.wallPrimerCoats} primerSqftAdjust={room.wallPrimerSqftAdjust} onPrimer={(p) => roomOps.update(i, { wallPrimerPaintId: p.paintId, wallPrimerCoats: p.coats, wallPrimerSqftAdjust: p.sqftAdjust })} />
-                      <SurfaceControl label="Ceiling" on={room.paintCeiling} onToggle={(v) => roomOps.update(i, { paintCeiling: v })} coats={room.ceilingCoats} onCoats={(v) => roomOps.update(i, { ceilingCoats: v })} paintId={room.ceilingPaintId} onPaint={(id, name) => roomOps.update(i, { ceilingPaintId: id, ceilingProduct: name })} paintOptions={paintItems}
+                      <SurfaceControl label="Ceiling" on={room.paintCeiling} onToggle={(v) => roomOps.update(i, { paintCeiling: v })} coats={room.ceilingCoats} onCoats={(v) => roomOps.update(i, { ceilingCoats: v })} paintId={room.ceilingPaintId} onPaint={(id, name) => roomOps.update(i, { ceilingPaintId: id, ceilingProduct: name })} paintOptions={paintItems} sheen={room.ceilingSheen} onSheen={(v) => roomOps.update(i, { ceilingSheen: v })}
                         primerPaintId={room.ceilingPrimerPaintId} primerCoats={room.ceilingPrimerCoats} primerSqftAdjust={room.ceilingPrimerSqftAdjust} onPrimer={(p) => roomOps.update(i, { ceilingPrimerPaintId: p.paintId, ceilingPrimerCoats: p.coats, ceilingPrimerSqftAdjust: p.sqftAdjust })} />
-                      <SurfaceControl label="Trim" on={room.paintTrim} onToggle={(v) => roomOps.update(i, { paintTrim: v })} coats={room.trimCoats} onCoats={(v) => roomOps.update(i, { trimCoats: v })} paintId={room.trimPaintId} onPaint={(id, name) => roomOps.update(i, { trimPaintId: id, trimProduct: name })} paintOptions={paintItems}
+                      <SurfaceControl label="Trim" on={room.paintTrim} onToggle={(v) => roomOps.update(i, { paintTrim: v })} coats={room.trimCoats} onCoats={(v) => roomOps.update(i, { trimCoats: v })} paintId={room.trimPaintId} onPaint={(id, name) => roomOps.update(i, { trimPaintId: id, trimProduct: name })} paintOptions={paintItems} sheen={room.trimSheen} onSheen={(v) => roomOps.update(i, { trimSheen: v })}
                         primerPaintId={room.trimPrimerPaintId} primerCoats={room.trimPrimerCoats} primerSqftAdjust={room.trimPrimerSqftAdjust} onPrimer={(p) => roomOps.update(i, { trimPrimerPaintId: p.paintId, trimPrimerCoats: p.coats, trimPrimerSqftAdjust: p.sqftAdjust })} />
                     </div>
                     <Openings room={room} onChange={(d) => roomOps.update(i, { deductions: d })} />
@@ -310,6 +310,7 @@ export default function EstimateBuilder({
                       <MiniNum value={c.rate} onChange={(v) => caOps.update(i, { rate: v })} suffix="$" />
                       <MiniNum value={c.coats} onChange={(v) => caOps.update(i, { coats: Math.round(v) })} suffix="ct" />
                       <div style={{ flex: 2, minWidth: 150 }}><PaintSelect options={paintItems} value={c.paintId} onChange={(id, name) => caOps.update(i, { paintId: id, paintProduct: name })} placeholder="— No paint —" /></div>
+                      <div style={{ width: 130 }}><SheenSelect value={c.sheen} onChange={(v) => caOps.update(i, { sheen: v })} /></div>
                       <button className="btn btn-icon btn-danger btn-sm" onClick={() => caOps.remove(i)}>✕</button>
                     </div>
                     <PrimerRow paintId={c.primerPaintId} coats={c.primerCoats} sqftAdjust={c.primerSqftAdjust} options={paintItems} onChange={(p) => caOps.update(i, { primerPaintId: p.paintId, primerCoats: p.coats, primerSqftAdjust: p.sqftAdjust })} />
@@ -337,9 +338,10 @@ export default function EstimateBuilder({
                     <Labeled label={`Frames (@ ${formatCurrency(rates.cabinetFrameRate)})`}><NumberField value={c.frameCount} min={0} onChange={(v) => cabOps.update(i, { frameCount: v })} /></Labeled>
                     <Labeled label="Paint Coats"><NumberField value={c.coats} min={1} onChange={(v) => cabOps.update(i, { coats: Math.round(v) })} /></Labeled>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 120px", gap: 12, marginTop: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 120px", gap: 12, marginTop: 12 }}>
                     <Labeled label="Primer"><PaintSelect options={paintItems} value={c.primerId} onChange={(id, name) => cabOps.update(i, { primerId: id, primerProduct: name })} placeholder="— No primer —" /></Labeled>
                     <Labeled label="Paint"><PaintSelect options={paintItems} value={c.paintId} onChange={(id, name) => cabOps.update(i, { paintId: id, paintProduct: name })} /></Labeled>
+                    <Labeled label="Sheen"><SheenSelect value={c.sheen} onChange={(v) => cabOps.update(i, { sheen: v })} /></Labeled>
                     <Labeled label="Primer Coats"><NumberField value={c.primerCoats} min={1} onChange={(v) => cabOps.update(i, { primerCoats: Math.round(v) })} /></Labeled>
                   </div>
                   <MaterialsEditor materials={c.materials} onChange={(m) => cabOps.update(i, { materials: m })} options={materialItems} />
@@ -370,6 +372,7 @@ export default function EstimateBuilder({
                       <Labeled label="Coats"><NumberField value={h.coats} min={1} onChange={(v) => houseOps.update(i, { coats: Math.round(v) })} /></Labeled>
                       <Labeled label="Adjust SqFt (+/-)"><NumberField value={h.sidingSqftAdjust} onChange={(v) => houseOps.update(i, { sidingSqftAdjust: v })} /></Labeled>
                       <Labeled label="Paint"><PaintSelect options={paintItems} value={h.paintId} onChange={(id, name) => houseOps.update(i, { paintId: id, paintProduct: name })} /></Labeled>
+                      <Labeled label="Sheen"><SheenSelect value={h.sheen} onChange={(v) => houseOps.update(i, { sheen: v })} /></Labeled>
                     </div>
                     <PrimerRow paintId={h.primerPaintId} coats={h.primerCoats} sqftAdjust={h.primerSqftAdjust} options={paintItems} onChange={(p) => houseOps.update(i, { primerPaintId: p.paintId, primerCoats: p.coats, primerSqftAdjust: p.sqftAdjust })} />
                     <SubList title="Deductions" items={h.deductions} onAdd={() => houseOps.update(i, { deductions: [...h.deductions, { label: "Window", width: 3, height: 4 }] })} addLabel="+ Deduction"
@@ -417,7 +420,9 @@ export default function EstimateBuilder({
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginTop: 12 }}>
                       <Labeled label="Floor Stain"><PaintSelect options={paintItems} value={d.floorStainId} onChange={(id) => deckOps.update(i, { floorStainId: id })} placeholder="Default floor stain" /></Labeled>
+                      <Labeled label="Floor Sheen"><SheenSelect value={d.floorSheen} onChange={(v) => deckOps.update(i, { floorSheen: v })} /></Labeled>
                       <Labeled label="Rail Stain"><PaintSelect options={paintItems} value={d.railStainId} onChange={(id) => deckOps.update(i, { railStainId: id })} placeholder="Default rail stain" /></Labeled>
+                      <Labeled label="Rail Sheen"><SheenSelect value={d.railSheen} onChange={(v) => deckOps.update(i, { railSheen: v })} /></Labeled>
                       <Labeled label="Power Wash ($)"><NumberField value={d.powerWashCost} onChange={(v) => deckOps.update(i, { powerWashCost: v })} suffix="$" /></Labeled>
                       <Labeled label="Wood Repl. ($)"><NumberField value={d.woodReplCost} onChange={(v) => deckOps.update(i, { woodReplCost: v })} suffix="$" /></Labeled>
                     </div>
@@ -567,9 +572,10 @@ function SectionToolbar({ label, onAdd, addLabel, tight }: { label: string; onAd
   );
 }
 
-function SurfaceControl({ label, on, onToggle, coats, onCoats, paintId, onPaint, paintOptions, primerPaintId, primerCoats, primerSqftAdjust, onPrimer }: {
+function SurfaceControl({ label, on, onToggle, coats, onCoats, paintId, onPaint, paintOptions, sheen, onSheen, primerPaintId, primerCoats, primerSqftAdjust, onPrimer }: {
   label: string; on: boolean; onToggle: (v: boolean) => void; coats: number; onCoats: (v: number) => void;
   paintId: number | null; onPaint: (id: number | null, name: string) => void; paintOptions: PaintOption[];
+  sheen: string; onSheen: (v: string) => void;
   primerPaintId: number | null; primerCoats: number; primerSqftAdjust: number; onPrimer: (p: PrimerVal) => void;
 }) {
   return (
@@ -581,6 +587,7 @@ function SurfaceControl({ label, on, onToggle, coats, onCoats, paintId, onPaint,
       {on && (
         <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
           <PaintSelect options={paintOptions} value={paintId} onChange={onPaint} placeholder="Default (House Paint)" />
+          <Labeled label="Sheen"><SheenSelect value={sheen} onChange={onSheen} /></Labeled>
           <PrimerRow paintId={primerPaintId} coats={primerCoats} sqftAdjust={primerSqftAdjust} options={paintOptions} onChange={onPrimer} compact />
         </div>
       )}
@@ -676,6 +683,7 @@ function UnitSection({ title, items, ops, addLabel, blank, paintItems, materialI
               )}
               <Labeled label="Coats" width={70}><MiniNum value={u.coats} onChange={(v) => ops.update(i, { coats: Math.round(v) })} /></Labeled>
               <Labeled label="Paint" width={170}><PaintSelect options={paintItems} value={u.paintId} onChange={(id, name) => ops.update(i, { paintId: id, paintProduct: name })} /></Labeled>
+              <Labeled label="Sheen" width={120}><SheenSelect value={u.sheen} onChange={(v) => ops.update(i, { sheen: v })} /></Labeled>
               <button className="btn btn-icon btn-danger btn-sm" onClick={() => ops.remove(i)}>✕</button>
             </div>
             <PrimerRow paintId={u.primerPaintId} coats={u.primerCoats} sqftAdjust={u.primerSqftAdjust} options={paintItems} onChange={(p) => ops.update(i, { primerPaintId: p.paintId, primerCoats: p.coats, primerSqftAdjust: p.sqftAdjust })} />
