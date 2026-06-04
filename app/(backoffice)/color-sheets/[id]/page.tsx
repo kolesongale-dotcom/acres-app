@@ -38,7 +38,10 @@ export default async function ColorSheetViewPage({
             <Link href={`/proposals/${proposalId}`} style={{ color: "var(--text-muted)" }}>proposal</Link>
           </p>
         </div>
-        <a href={`/proposals/${proposalId}/colors`} target="_blank" rel="noreferrer" className="btn btn-secondary">↗ Open client form</a>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <a href={`/api/estimates/${data.estimateId}/shopping-list`} target="_blank" rel="noreferrer" className="btn btn-secondary">↓ Shopping List</a>
+          <a href={`/proposals/${proposalId}/colors`} target="_blank" rel="noreferrer" className="btn btn-secondary">↗ Open client form</a>
+        </div>
       </div>
 
       {base && (

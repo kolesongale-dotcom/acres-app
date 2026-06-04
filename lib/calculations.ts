@@ -51,6 +51,9 @@ export interface CalcLineItem {
   markup: number;
   taxable?: boolean;
   source?: string;
+  // Optional metadata used by the shopping list (paint/stain/primer lines only):
+  paintId?: number;                                  // Price Book paint id
+  slot?: { kind: string; id: number; field: string }; // colorable surface slot
 }
 
 export type PaintCatalog = Record<number, { name: string; unitCost: number; coverage: number; markup: number; category?: string }>;
@@ -117,8 +120,9 @@ function surfaceMaterials(opts: {
   rates: JobRates;
   source: string;
   label: string;
+  slot?: { kind: string; id: number; field: string };
 }): { lines: CalcLineItem[]; paintGallons: number; primerGallons: number } {
-  const { baseArea, paintId, coats, primer, catalog, rates, source, label } = opts;
+  const { baseArea, paintId, coats, primer, catalog, rates, source, label, slot } = opts;
   const lines: CalcLineItem[] = [];
   let paintGallons = 0, primerGallons = 0;
   const pm = n(rates.laborMarkup);
@@ -127,7 +131,7 @@ function surfaceMaterials(opts: {
     paintGallons = gallonsFor(baseArea, coats, cov(paintId, catalog));
     if (paintGallons > 0) {
       const item = catalog[paintId];
-      if (item) lines.push({ description: `Paint — ${item.name} (${label})`, category: "Material", quantity: paintGallons, unitCost: item.unitCost, markup: item.markup, source });
+      if (item) lines.push({ description: `Paint — ${item.name} (${label})`, category: "Material", quantity: paintGallons, unitCost: item.unitCost, markup: item.markup, source, paintId, slot });
     }
   }
   if (primer && primer.paintId != null) {
@@ -135,7 +139,7 @@ function surfaceMaterials(opts: {
     primerGallons = gallonsFor(primerArea, primer.coats, cov(primer.paintId, catalog));
     const item = catalog[primer.paintId];
     if (primerGallons > 0 && item) {
-      lines.push({ description: `Primer — ${item.name} (${label})`, category: "Material", quantity: primerGallons, unitCost: item.unitCost, markup: item.markup, source });
+      lines.push({ description: `Primer — ${item.name} (${label})`, category: "Material", quantity: primerGallons, unitCost: item.unitCost, markup: item.markup, source, paintId: primer.paintId });
     }
     // primer labor on the primed area
     if (primerArea > 0 && n(rates.primerRate) > 0) {
@@ -226,19 +230,19 @@ function roomBuilt(r: RoomInput, rates: JobRates, catalog: PaintCatalog): Built 
 
   if (r.paintWalls && netWall > 0) {
     lines.push(laborLine(`${r.name} — Walls`, netWall, rates.wallRate, m, src));
-    const sm = surfaceMaterials({ baseArea: netWall, paintId: r.wallPaintId ?? null, coats: r.wallCoats, primer: r.wallPrimer, catalog, rates, source: src, label: `${r.name} Walls` });
+    const sm = surfaceMaterials({ baseArea: netWall, paintId: r.wallPaintId ?? null, coats: r.wallCoats, primer: r.wallPrimer, catalog, rates, source: src, label: `${r.name} Walls`, slot: r.id != null ? { kind: "room", id: r.id, field: "wallPaintId" } : undefined });
     lines.push(...sm.lines);
     parts.push(`Walls: ${coatsTxt(r.wallCoats)}${galTxt(sm.paintGallons, paintName(r.wallPaintId, catalog))}`);
   }
   if (r.paintCeiling && ceiling > 0) {
     lines.push(laborLine(`${r.name} — Ceiling`, ceiling, rates.ceilingRate, m, src));
-    const sm = surfaceMaterials({ baseArea: ceiling, paintId: r.ceilingPaintId ?? null, coats: r.ceilingCoats, primer: r.ceilingPrimer, catalog, rates, source: src, label: `${r.name} Ceiling` });
+    const sm = surfaceMaterials({ baseArea: ceiling, paintId: r.ceilingPaintId ?? null, coats: r.ceilingCoats, primer: r.ceilingPrimer, catalog, rates, source: src, label: `${r.name} Ceiling`, slot: r.id != null ? { kind: "room", id: r.id, field: "ceilingPaintId" } : undefined });
     lines.push(...sm.lines);
     parts.push(`Ceiling: ${coatsTxt(r.ceilingCoats)}${galTxt(sm.paintGallons, paintName(r.ceilingPaintId, catalog))}`);
   }
   if (r.paintTrim && trimLf > 0) {
     lines.push(laborLine(`${r.name} — Trim (${formatNumber(trimLf)} lf)`, trimLf, rates.trimRate, m, src));
-    const sm = surfaceMaterials({ baseArea: trimLf / 2, paintId: r.trimPaintId ?? null, coats: r.trimCoats, primer: r.trimPrimer, catalog, rates, source: src, label: `${r.name} Trim` });
+    const sm = surfaceMaterials({ baseArea: trimLf / 2, paintId: r.trimPaintId ?? null, coats: r.trimCoats, primer: r.trimPrimer, catalog, rates, source: src, label: `${r.name} Trim`, slot: r.id != null ? { kind: "room", id: r.id, field: "trimPaintId" } : undefined });
     lines.push(...sm.lines);
     parts.push(`Trim: ${coatsTxt(r.trimCoats)}${galTxt(sm.paintGallons, paintName(r.trimPaintId, catalog))}`);
   }
@@ -269,12 +273,12 @@ function cabinetBuilt(c: CabinetInput, rates: JobRates, catalog: PaintCatalog): 
   if (c.paintId != null) {
     paintGal = Math.ceil(perPiece * Math.max(1, n(c.coats)));
     const item = catalog[c.paintId];
-    if (paintGal > 0 && item) lines.push({ description: `Paint — ${item.name} (${c.name})`, category: "Material", quantity: paintGal, unitCost: item.unitCost, markup: item.markup, source: src });
+    if (paintGal > 0 && item) lines.push({ description: `Paint — ${item.name} (${c.name})`, category: "Material", quantity: paintGal, unitCost: item.unitCost, markup: item.markup, source: src, paintId: c.paintId ?? undefined, slot: c.id != null ? { kind: "cabinet", id: c.id, field: "paintId" } : undefined });
   }
   if (c.primerId != null) {
     primerGal = Math.ceil(perPiece * Math.max(1, n(c.primerCoats)));
     const item = catalog[c.primerId];
-    if (primerGal > 0 && item) lines.push({ description: `Primer — ${item.name} (${c.name})`, category: "Material", quantity: primerGal, unitCost: item.unitCost, markup: item.markup, source: src });
+    if (primerGal > 0 && item) lines.push({ description: `Primer — ${item.name} (${c.name})`, category: "Material", quantity: primerGal, unitCost: item.unitCost, markup: item.markup, source: src, paintId: c.primerId ?? undefined });
   }
   lines.push(...materialLines(c.materials, src));
   const pieces = n(c.doorCount) + n(c.drawerCount) + n(c.frameCount);
@@ -299,12 +303,12 @@ function deckBuilt(d: DeckInput, rates: JobRates, catalog: PaintCatalog): Built 
   if (d.floorStainId != null) {
     floorGal = gallonsFor(floor + lattice, d.coats, cov(d.floorStainId, catalog));
     const item = catalog[d.floorStainId];
-    if (floorGal > 0 && item) lines.push({ description: `Stain — ${item.name} (${d.name} floor)`, category: "Material", quantity: floorGal, unitCost: item.unitCost, markup: item.markup, source: src });
+    if (floorGal > 0 && item) lines.push({ description: `Stain — ${item.name} (${d.name} floor)`, category: "Material", quantity: floorGal, unitCost: item.unitCost, markup: item.markup, source: src, paintId: d.floorStainId ?? undefined, slot: d.id != null ? { kind: "deck", id: d.id, field: "floorStainId" } : undefined });
   }
   if (d.railStainId != null && railing > 0) {
     const rg = gallonsFor(railing, d.coats, cov(d.railStainId, catalog));
     const item = catalog[d.railStainId];
-    if (rg > 0 && item) lines.push({ description: `Stain — ${item.name} (${d.name} rails)`, category: "Material", quantity: rg, unitCost: item.unitCost, markup: item.markup, source: src });
+    if (rg > 0 && item) lines.push({ description: `Stain — ${item.name} (${d.name} rails)`, category: "Material", quantity: rg, unitCost: item.unitCost, markup: item.markup, source: src, paintId: d.railStainId ?? undefined, slot: d.id != null ? { kind: "deck", id: d.id, field: "railStainId" } : undefined });
   }
   // primer on floor
   if (d.primer && d.primer.paintId != null) {
@@ -326,7 +330,7 @@ function exteriorBuilt(h: ExteriorHouseInput, rates: JobRates, catalog: PaintCat
     if (n(rates.powerWashRate) > 0) lines.push(laborLine(`${h.name} — Power Washing`, net, rates.powerWashRate, m, src));
   }
   for (const rp of h.replacements ?? []) if (n(rp.cost) > 0) lines.push({ description: `${h.name} — ${rp.description || "Material Replacement"}`, category: "Material", quantity: 1, unitCost: n(rp.cost), markup: m, source: src });
-  const sm = surfaceMaterials({ baseArea: net, paintId: h.paintId ?? null, coats: h.coats, primer: h.primer, catalog, rates, source: src, label: `${h.name} Siding` });
+  const sm = surfaceMaterials({ baseArea: net, paintId: h.paintId ?? null, coats: h.coats, primer: h.primer, catalog, rates, source: src, label: `${h.name} Siding`, slot: h.id != null ? { kind: "exterior", id: h.id, field: "paintId" } : undefined });
   lines.push(...sm.lines);
   lines.push(...materialLines(h.materials, src));
   const subtitle = `Siding ${h.sidingMaterial}, ${formatNumber(net)} sf. ${coatsTxt(h.coats)}${galTxt(sm.paintGallons, paintName(h.paintId, catalog))}.${h.primer && h.primer.paintId != null ? " Primer applied." : ""} Power washed.`;
@@ -339,7 +343,7 @@ function doorBuilt(d: DoorInput, rates: JobRates, catalog: PaintCatalog): Built 
   const area = n(d.width) * n(d.height) * Math.max(1, n(d.paintedSides)) * Math.max(1, n(d.count));
   const lines: CalcLineItem[] = [];
   if (area > 0) lines.push(laborLine(`${d.name} — Door`, area, rates.doorRate, m, src));
-  const sm = surfaceMaterials({ baseArea: area, paintId: d.paintId ?? null, coats: d.coats, primer: d.primer, catalog, rates, source: src, label: d.name });
+  const sm = surfaceMaterials({ baseArea: area, paintId: d.paintId ?? null, coats: d.coats, primer: d.primer, catalog, rates, source: src, label: d.name, slot: d.id != null ? { kind: "door", id: d.id, field: "paintId" } : undefined });
   lines.push(...sm.lines);
   lines.push(...materialLines(d.materials, src));
   const subtitle = `${n(d.count)} door${n(d.count) === 1 ? "" : "s"}, ${n(d.paintedSides)} side${n(d.paintedSides) === 1 ? "" : "s"} (${formatNumber(area)} sf). ${coatsTxt(d.coats)}${galTxt(sm.paintGallons, paintName(d.paintId, catalog))}.`;
@@ -356,7 +360,7 @@ function shutterBuilt(s: ShutterInput, rates: JobRates, catalog: PaintCatalog): 
   if (n(s.story2) > 0) lines.push(laborLine(`${s.name} — 2nd Story`, n(s.story2), rates.shutterStory2Rate, m, src));
   if (n(s.story3) > 0) lines.push(laborLine(`${s.name} — 3rd Story`, n(s.story3), rates.shutterStory3Rate, m, src));
   if (n(s.customQty) > 0) lines.push(laborLine(`${s.name} — Custom`, n(s.customQty), s.customRate, m, src));
-  const sm = surfaceMaterials({ baseArea: paintSqFt, paintId: s.paintId ?? null, coats: s.coats, primer: s.primer, catalog, rates, source: src, label: s.name });
+  const sm = surfaceMaterials({ baseArea: paintSqFt, paintId: s.paintId ?? null, coats: s.coats, primer: s.primer, catalog, rates, source: src, label: s.name, slot: s.id != null ? { kind: "shutter", id: s.id, field: "paintId" } : undefined });
   lines.push(...sm.lines);
   lines.push(...materialLines(s.materials, src));
   const subtitle = `${units} shutters (${n(s.story1)}/${n(s.story2)}/${n(s.story3)} by story). ${coatsTxt(s.coats)}${galTxt(sm.paintGallons, paintName(s.paintId, catalog))}.`;
@@ -369,7 +373,7 @@ function garageBuilt(g: GarageInput, rates: JobRates, catalog: PaintCatalog): Bu
   const area = n(g.width) * n(g.height) * 2 * Math.max(1, n(g.count));
   const lines: CalcLineItem[] = [];
   if (area > 0) lines.push(laborLine(`${g.name} — Garage Door`, area, rates.garageRate, m, src));
-  const sm = surfaceMaterials({ baseArea: area, paintId: g.paintId ?? null, coats: g.coats, primer: g.primer, catalog, rates, source: src, label: g.name });
+  const sm = surfaceMaterials({ baseArea: area, paintId: g.paintId ?? null, coats: g.coats, primer: g.primer, catalog, rates, source: src, label: g.name, slot: g.id != null ? { kind: "garage", id: g.id, field: "paintId" } : undefined });
   lines.push(...sm.lines);
   lines.push(...materialLines(g.materials, src));
   const subtitle = `${n(g.count)} garage door${n(g.count) === 1 ? "" : "s"}, both sides (${formatNumber(area)} sf). ${coatsTxt(g.coats)}${galTxt(sm.paintGallons, paintName(g.paintId, catalog))}.`;
@@ -383,7 +387,7 @@ function customBuilt(c: CustomAreaInput, rates: JobRates, catalog: PaintCatalog)
   const base = c.measureType === "trim" ? n(c.amount) / 2 : n(c.amount);
   const lines: CalcLineItem[] = [];
   if (n(c.amount) > 0 && n(c.rate) > 0) lines.push(laborLine(`${c.label}`, n(c.amount), c.rate, m, src));
-  const sm = surfaceMaterials({ baseArea: base, paintId: c.paintId ?? null, coats: c.coats, primer: c.primer, catalog, rates, source: src, label: c.label });
+  const sm = surfaceMaterials({ baseArea: base, paintId: c.paintId ?? null, coats: c.coats, primer: c.primer, catalog, rates, source: src, label: c.label, slot: c.id != null ? { kind: "custom", id: c.id, field: "paintId" } : undefined });
   lines.push(...sm.lines);
   lines.push(...materialLines(c.materials, src));
   const subtitle = `${formatNumber(n(c.amount))} ${unit}. ${coatsTxt(c.coats)}${galTxt(sm.paintGallons, paintName(c.paintId, catalog))}.`;

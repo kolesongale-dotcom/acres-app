@@ -551,6 +551,8 @@ export default function EstimateBuilder({
               <div className="card" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <button className="btn btn-primary" onClick={handleGenerateProposal} disabled={pending}>{pending ? <LoadingSpinner size={16} /> : hasProposal ? "Save & Open Proposal" : "Generate Proposal"}</button>
                 {hasProposal && proposalId && <Link href={`/proposals/${proposalId}`} className="btn btn-secondary" style={{ width: "100%" }}>View Proposal</Link>}
+                <a href={`/api/estimates/${estimateId}/shopping-list`} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ width: "100%" }}>↓ Shopping List (PDF)</a>
+                <span style={{ fontSize: 11.5, color: "var(--text-dim)" }}>Reflects the last <strong>saved</strong> estimate. Save first to include recent edits.</span>
               </div>
             </div>
           </div>
