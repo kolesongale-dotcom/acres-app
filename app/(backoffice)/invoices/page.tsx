@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/calculations";
 import { invoiceStatus, INVOICE_STATUS_COLOR } from "@/lib/invoiceStatus";
 import PageHeader from "@/components/PageHeader";
 import EmptyState from "@/components/EmptyState";
+import NewInvoice from "./NewInvoice";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,14 @@ export default async function InvoicesPage() {
     include: { customer: true },
   });
   const estById = new Map(estimates.map((e) => [e.id, e]));
+
+  // Options for the "New Invoice" picker (proposal + optional change order).
+  const [propsForPicker, cosForPicker] = await Promise.all([
+    prisma.proposal.findMany({ include: { estimate: { include: { customer: true } } }, orderBy: { updatedAt: "desc" } }),
+    prisma.changeOrder.findMany({ orderBy: { updatedAt: "desc" } }),
+  ]);
+  const proposalOpts = propsForPicker.map((p) => ({ id: p.id, estimateId: p.estimateId, label: `${p.proposalNumber} · ${customerName(p.estimate.customer)}` }));
+  const coOpts = cosForPicker.map((c) => ({ id: c.id, estimateId: c.estimateId, label: `${c.changeOrderNumber} (${formatCurrency(c.total)})` }));
 
   const rows = invoices.map((inv) => {
     const est = estById.get(inv.estimateId);
@@ -41,7 +50,7 @@ export default async function InvoicesPage() {
 
   return (
     <div>
-      <PageHeader title="Invoices" subtitle="Bill accepted jobs and track payments." />
+      <PageHeader title="Invoices" subtitle="Bill accepted jobs and track payments." actions={<NewInvoice proposals={proposalOpts} changeOrders={coOpts} />} />
 
       {rows.length === 0 ? (
         <div className="card">

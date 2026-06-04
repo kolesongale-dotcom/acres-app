@@ -21,6 +21,7 @@ function isPublicPath(pathname: string): boolean {
   // Public client signing page + color/sheen sheet (and their server-action POSTs).
   if (/^\/proposals\/\d+\/sign\/?$/.test(pathname)) return true;
   if (/^\/proposals\/\d+\/colors\/?$/.test(pathname)) return true;
+  if (/^\/change-orders\/\d+\/sign\/?$/.test(pathname)) return true;
   return false;
 }
 

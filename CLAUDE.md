@@ -280,6 +280,33 @@ A client-filled sheet of the actual paint colors per surface (clients often pick
 - **Email**: the proposal email inserts the color-sheet link right **below** the sign link
   (`ProposalDetail.insertSignLink`, both from `publicBaseUrl`).
 
+## Job Prep / Shopping List
+
+Per-job "what to buy" PDF at `GET /api/estimates/[id]/shopping-list` (buttons on the Estimate Summary
+tab + Color Sheet view). Calc engine tags paint/stain/primer lines with `paintId` + `slot`
+(`CalcLineItem`); `lib/shoppingList.ts buildShoppingList` groups them by **paint + color (from the
+Color Sheet) + sheen**, plus primers and supplies, at **unit cost** (what you pay). PDF in
+`lib/shoppingListPdf.ts`. Reflects the last **saved** estimate.
+
+## Warranty tracking
+
+`BusinessSettings.warrantyMonths` (Settings → Business, default 24) + `Estimate.completedAt` (set on the
+builder Setup tab → shows computed "Warranty Ends"). Dashboard adds an **auto follow-up 30 days before**
+a job's warranty expires (`completedAt + warrantyMonths`), via the same derived-follow-up mechanism
+(`FollowUpRow.subtitle` overrides the line).
+
+## Change Orders (`/change-orders`)
+
+Mid-job scope changes. `ChangeOrder` (number `CO-0001`, estimateId, `lineItemsJson` `[{description,
+amount}]`, total, status, signature; **no Prisma relation** to Estimate). Owner creates one for a job
+(`createChangeOrder`), adds line items (`updateChangeOrder`), and the **client e-signs** a public page
+(`/change-orders/[id]/sign`, middleware-allowed; `signChangeOrder`). Negative amounts = credits.
+- **Invoice integration**: the Invoices tab's **"New Invoice"** has **two dropdowns — Proposal + Change
+  Order**. `buildInvoice(proposalId, changeOrderId)` (in `lib/actions/invoices.ts`, shares
+  `computeInvoiceSnapshot`) sets the invoice = **accepted-tier total + change-order total**, with both
+  as line items, creating or updating the job's invoice (payments/due-date/notes preserved).
+  `Invoice.changeOrderId` records the link. The proposal's "Create Invoice" button stays (no change order).
+
 ## Invoices (`/invoices`)
 
 `Invoice` (1—1 with an accepted `Estimate` by unique `estimateId`, **no Prisma relation** — query

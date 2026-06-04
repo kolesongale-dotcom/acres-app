@@ -10,6 +10,7 @@ const NAV = [
   { href: "/estimates", label: "Estimates", icon: "▤" },
   { href: "/proposals", label: "Proposals", icon: "✎" },
   { href: "/color-sheets", label: "Color Sheets", icon: "🎨" },
+  { href: "/change-orders", label: "Change Orders", icon: "⇄" },
   { href: "/invoices", label: "Invoices", icon: "🧾" },
   { href: "/price-book", label: "Price Book", icon: "▦" },
   { href: "/budget", label: "Budget", icon: "$" },

@@ -544,6 +544,7 @@ model Invoice {
   proposalId    Int?
   tier          String    @default("full")
   tierLabel     String    @default("")
+  changeOrderId Int?      // optional: a change order rolled into this invoice
   subtotal      Float     @default(0)
   total         Float     @default(0)
   lineItemsJson String    @default("[]") // [{name,total}] snapshot for display
@@ -561,6 +562,24 @@ model Payment {
   paidAt    DateTime @default(now())
   note      String   @default("")
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// Mid-job scope change for a job. Client e-signs (public link). Its total can
+// roll into the job's invoice (invoice = proposal tier + change order). No Prisma
+// relation to Estimate (query separately).
+model ChangeOrder {
+  id                Int       @id @default(autoincrement())
+  changeOrderNumber String    @unique
+  estimateId        Int
+  description       String    @default("")
+  lineItemsJson     String    @default("[]") // [{description, amount}]
+  total             Float     @default(0)
+  status            String    @default("Draft") // Draft / Sent / Accepted
+  signatureData     String    @default("")
+  signatureName     String    @default("")
+  signedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 // Client-entered color choice for one painted surface (keyed by "kind:id:field"
