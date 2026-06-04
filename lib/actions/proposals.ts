@@ -133,6 +133,46 @@ async function captureRecommended(estimateId: number): Promise<Record<string, nu
   return recommended;
 }
 
+/**
+ * Client-facing: save the whole Color/Sheen sheet. Per surface: color name/code/
+ * provider (stored in ColorSelection) + sheen (stored on the estimate component).
+ */
+export async function saveColorSheet(
+  proposalId: number,
+  rows: { kind: string; id: number; field: string; colorName: string; colorCode: string; provider: string; sheen: string }[]
+): Promise<ActionResult> {
+  try {
+    const proposal = await prisma.proposal.findUnique({ where: { id: proposalId } });
+    if (!proposal) return { success: false, error: "Proposal not found." };
+    const estimateId = proposal.estimateId;
+
+    for (const r of rows) {
+      if (!isValidSlotField(r.kind, r.field)) continue;
+      const key = `${r.kind}:${r.id}:${r.field}`;
+      await prisma.colorSelection.upsert({
+        where: { estimateId_slotKey: { estimateId, slotKey: key } },
+        update: { colorName: r.colorName ?? "", colorCode: r.colorCode ?? "", provider: r.provider ?? "" },
+        create: { estimateId, slotKey: key, colorName: r.colorName ?? "", colorCode: r.colorCode ?? "", provider: r.provider ?? "" },
+      });
+      // Sheen → the estimate component's sheen column.
+      if (SHEEN_OPTIONS.includes(r.sheen as (typeof SHEEN_OPTIONS)[number])) {
+        const sheenCol = sheenFieldFor(r.kind, r.field);
+        if (sheenCol) {
+          const delegate = SLOT_DELEGATE[r.kind as PaintSlotKind]?.();
+          if (delegate) await delegate.updateMany({ where: { id: r.id, estimateId }, data: { [sheenCol]: r.sheen } });
+        }
+      }
+    }
+
+    revalidatePath(`/proposals/${proposalId}/colors`);
+    revalidatePath(`/color-sheets/${proposalId}`);
+    return { success: true };
+  } catch (e) {
+    console.error(e);
+    return { success: false, error: "Failed to save color selections." };
+  }
+}
+
 /** Create a proposal for an estimate, or return the existing one. */
 export async function generateProposal(
   estimateId: number

@@ -6,9 +6,8 @@ import {
   computeAll, calcTiers, formatCurrency,
   type FullEstimateInput, type TierSettings, type PaintCatalog,
 } from "@/lib/calculations";
-import { extractPaintSlots, applyPaintSelection, retailPerGallon, slotKey, type PaintSlotRef } from "@/lib/paintSlots";
-import { selectTierPublic, signProposal, selectPaintPublic, selectSheenPublic } from "@/lib/actions/proposals";
-import { SHEEN_OPTIONS } from "@/lib/types";
+import { extractPaintSlots, applyPaintSelection, retailPerGallon, type PaintSlotRef } from "@/lib/paintSlots";
+import { selectTierPublic, signProposal, selectPaintPublic } from "@/lib/actions/proposals";
 
 export default function SignFlow({
   proposalId,
@@ -18,7 +17,6 @@ export default function SignFlow({
   accent,
   resources,
   recommended,
-  sheens: initialSheens,
   children,
 }: {
   proposalId: number;
@@ -28,18 +26,8 @@ export default function SignFlow({
   accent: string;
   resources?: { interior: string; exterior: string };
   recommended?: Record<string, number>; // "kind:id:field" -> recommended paintId
-  sheens?: Record<string, string>; // "kind:id:field" -> sheen
   children?: React.ReactNode; // static sections (photos, notes, SOPs, terms)
 }) {
-  const [sheenState, setSheenState] = useState<Record<string, string>>(initialSheens ?? {});
-
-  function chooseSheen(ref: PaintSlotRef, sheen: string) {
-    setSheenState((prev) => ({ ...prev, [slotKey(ref)]: sheen }));
-    startSaving(async () => {
-      const res = await selectSheenPublic(proposalId, ref, sheen);
-      if (!res.success) setPaintNote(res.error || "Couldn't save the sheen change.");
-    });
-  }
   const [lightbox, setLightbox] = useState<{ src: string; title: string } | null>(null);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -220,29 +208,17 @@ export default function SignFlow({
                       </div>
                       <div style={{ fontSize: 12, color: "#94a3b8" }}>{slot.category} · {formatCurrency(perGal)}/gal</div>
                     </div>
-                    <div style={{ display: "flex", gap: 8, flex: "1 1 320px", minWidth: 260, flexWrap: "wrap" }}>
-                      <select
-                        value={slot.currentPaintId}
-                        onChange={(e) => choosePaint(slot.ref, Number(e.target.value))}
-                        style={{ flex: "2 1 200px", minWidth: 180, padding: "10px 12px", fontSize: 14, borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#0f172a" }}
-                      >
-                        {opts.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.name} — {formatCurrency(o.perGal)}/gal{o.id === recId ? "  ★ Recommended" : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={sheenState[slotKey(slot.ref)] ?? "Unsure"}
-                        onChange={(e) => chooseSheen(slot.ref, e.target.value)}
-                        title="Sheen / finish"
-                        style={{ flex: "1 1 120px", minWidth: 110, padding: "10px 12px", fontSize: 14, borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#0f172a" }}
-                      >
-                        {SHEEN_OPTIONS.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <select
+                      value={slot.currentPaintId}
+                      onChange={(e) => choosePaint(slot.ref, Number(e.target.value))}
+                      style={{ flex: "1 1 240px", minWidth: 220, padding: "10px 12px", fontSize: 14, borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", color: "#0f172a" }}
+                    >
+                      {opts.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.name} — {formatCurrency(o.perGal)}/gal{o.id === recId ? "  ★ Recommended" : ""}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 );
               })}

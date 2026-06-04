@@ -18,8 +18,9 @@ function isPublicPath(pathname: string): boolean {
   if (pathname.startsWith("/uploads/")) return true;
   if (pathname.startsWith("/_next/")) return true;
   if (pathname === "/favicon.ico" || pathname === "/robots.txt") return true;
-  // Public client signing page (and its server-action POSTs on the same path).
+  // Public client signing page + color/sheen sheet (and their server-action POSTs).
   if (/^\/proposals\/\d+\/sign\/?$/.test(pathname)) return true;
+  if (/^\/proposals\/\d+\/colors\/?$/.test(pathname)) return true;
   return false;
 }
 

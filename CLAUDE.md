@@ -263,6 +263,23 @@ dropdown beside each paint picker; `selectSheenPublic` persists it (mapping via 
 `lib/paintSlots.ts`). Sheen is NOT threaded through the calc engine — the sign page passes a
 `sheens` map keyed by the slot key (`buildSheens`).
 
+## Color/Sheen Selections (`/color-sheets` + public form)
+
+A client-filled sheet of the actual paint colors per surface (clients often pick colors last-minute).
+- **Public form** `app/proposals/[id]/colors/` (light theme, no auth — middleware allow-lists
+  `/proposals/\d+/colors`): one row per painted surface (same slots as the paint picker, via
+  `extractPaintSlots`), showing the chosen paint line, with inputs **Color Name, Color Code, Provider**
+  (`COLOR_PROVIDERS` dropdown + "Other"→free text) and **Sheen**. `saveColorSheet` (in
+  `lib/actions/proposals.ts`) upserts a `ColorSelection` (keyed by estimateId + `slotKey`) per surface
+  and writes **sheen to the estimate component's sheen column** (same place the builder uses, so they
+  cross-check).
+- **Sheen moved here**: sheen stays in the **estimate builder**, was **removed from the client sign
+  page**, and now lives on this form.
+- **Owner view** `/color-sheets` (list of all proposals) + `/color-sheets/[id]` (read-only table of the
+  client's choices + the shareable link). Surface list built by `lib/colorSheet.ts getColorSheetData`.
+- **Email**: the proposal email inserts the color-sheet link right **below** the sign link
+  (`ProposalDetail.insertSignLink`, both from `publicBaseUrl`).
+
 ## Invoices (`/invoices`)
 
 `Invoice` (1—1 with an accepted `Estimate` by unique `estimateId`, **no Prisma relation** — query

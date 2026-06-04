@@ -81,6 +81,7 @@ export default async function ProposalDetailPage({
       zohoDraftsUrl={zohoDraftsUrl(zoho?.region ?? "com")}
       photos={proposal.estimate.photos.map((p) => ({ url: p.url, caption: p.caption }))}
       signUrl={settings?.publicBaseUrl?.trim() ? `${settings.publicBaseUrl.trim().replace(/\/+$/, "")}/proposals/${proposal.id}/sign` : ""}
+      colorsUrl={settings?.publicBaseUrl?.trim() ? `${settings.publicBaseUrl.trim().replace(/\/+$/, "")}/proposals/${proposal.id}/colors` : ""}
     />
   );
 }

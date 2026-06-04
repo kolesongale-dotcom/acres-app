@@ -560,3 +560,18 @@ model Payment {
   note      String   @default("")
   invoice   Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
+
+// Client-entered color choice for one painted surface (keyed by "kind:id:field"
+// matching the paint slots). Sheen is NOT stored here — it lives on the estimate
+// component's sheen column. No Prisma relation to Estimate (query separately).
+model ColorSelection {
+  id         Int      @id @default(autoincrement())
+  estimateId Int
+  slotKey    String
+  colorName  String   @default("")
+  colorCode  String   @default("")
+  provider   String   @default("")
+  updatedAt  DateTime @updatedAt
+
+  @@unique([estimateId, slotKey])
+}

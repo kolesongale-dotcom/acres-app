@@ -29,16 +29,18 @@ interface Procedure { id: number; category: string; title: string; description: 
  * "...digital signature for easy acceptance" line so clients don't miss it. Falls
  * back to appending at the bottom if that line isn't in the template.
  */
-function insertSignLink(body: string, url: string): string {
-  if (!url) return body;
-  const linkBlock = `\n👉 Review your options, choose a deposit tier, and sign your proposal online here:\n${url}\n`;
+function insertSignLink(body: string, signUrl: string, colorsUrl: string): string {
+  if (!signUrl && !colorsUrl) return body;
+  let block = "";
+  if (signUrl) block += `\n👉 Review your options, choose a deposit tier, and sign your proposal online here:\n${signUrl}\n`;
+  if (colorsUrl) block += `\n🎨 Pick your paint colors & sheens here (you can finish this anytime before we start):\n${colorsUrl}\n`;
   const lines = body.split("\n");
   const idx = lines.findIndex((l) => /digital signature/i.test(l));
   if (idx >= 0) {
-    lines.splice(idx + 1, 0, linkBlock);
+    lines.splice(idx + 1, 0, block);
     return lines.join("\n");
   }
-  return `${body}\n\n— — —${linkBlock}`;
+  return `${body}\n\n— — —${block}`;
 }
 
 export default function ProposalDetail({
@@ -52,6 +54,7 @@ export default function ProposalDetail({
   zohoDraftsUrl,
   photos,
   signUrl,
+  colorsUrl,
 }: {
   proposal: {
     id: number;
@@ -74,6 +77,7 @@ export default function ProposalDetail({
   zohoDraftsUrl: string;
   photos: { url: string; caption: string }[];
   signUrl: string;
+  colorsUrl: string;
 }) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -111,7 +115,7 @@ export default function ProposalDetail({
   // body shown/copied, and use the rest (placeholders filled) as the email body.
   const filledFull = fillTemplate(emailTemplate);
   const baseBody = filledFull.replace(/^subject:.*\n?/i, "").replace(/^\s*\n/, "");
-  const filledBody = insertSignLink(baseBody, signUrl);
+  const filledBody = insertSignLink(baseBody, signUrl, colorsUrl);
   const mailtoHref = `mailto:${encodeURIComponent(estimate.clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(filledBody)}`;
 
   function changeStatus(next: string) {

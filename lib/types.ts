@@ -78,6 +78,16 @@ export const SHEEN_OPTIONS = [
 export type Sheen = (typeof SHEEN_OPTIONS)[number];
 export const DEFAULT_SHEEN = "Unsure";
 
+// Paint providers offered on the client Color/Sheen sheet. "Other" reveals a
+// free-text field. (Stored value is just the chosen/typed brand string.)
+export const COLOR_PROVIDERS = [
+  "Sherwin-Williams",
+  "Benjamin Moore",
+  "Home Depot",
+  "Lowe's",
+  "Other",
+] as const;
+
 export const SIDING_MATERIALS = [
   "Vinyl",
   "Stucco",
