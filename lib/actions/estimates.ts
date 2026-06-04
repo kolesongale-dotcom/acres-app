@@ -121,6 +121,7 @@ export async function saveEstimate(
           status: setup.status,
           startDate: setup.startDate ? new Date(setup.startDate) : null,
           endDate: setup.endDate ? new Date(setup.endDate) : null,
+          completedAt: setup.completedAt ? new Date(setup.completedAt) : null,
           durationDays: setup.durationDays,
           taxRate: setup.taxRate,
           discountType: setup.discountType,

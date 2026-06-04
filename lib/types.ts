@@ -359,6 +359,7 @@ export interface EstimateSetupPayload {
   status: string;
   startDate: string | null;
   endDate: string | null;
+  completedAt: string | null;
   durationDays: number;
   taxRate: number;
   discountType: string;

@@ -50,6 +50,7 @@ export interface Business {
   proposalEmailTemplate: string;
   resourceInteriorUrl: string;
   resourceExteriorUrl: string;
+  warrantyMonths: number;
 }
 export interface Procedure {
   id: number; category: string; title: string; description: string; isDefault: boolean; sortOrder: number;
@@ -420,6 +421,15 @@ function BusinessTab({ business }: { business: Business }) {
         <F label="Max Deposit (%)"><input type="number" step="0.01" className="input" value={form.maxDepositPercent} onChange={(e) => num("maxDepositPercent", e.target.value)} /></F>
         <F label="Max Deposit Discount (%)"><input type="number" step="0.01" className="input" value={form.maxDepositDiscount} onChange={(e) => num("maxDepositDiscount", e.target.value)} /></F>
       </div>
+      <hr className="divider" style={{ margin: "20px 0" }} />
+      <h3 className="section-title" style={{ marginBottom: 12 }}>Warranty</h3>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+        <F label="Warranty Period (months)"><input type="number" step="1" className="input" value={form.warrantyMonths} onChange={(e) => setForm((f) => ({ ...f, warrantyMonths: Math.max(0, Math.round(parseFloat(e.target.value) || 0)) }))} /></F>
+      </div>
+      <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 8, marginBottom: 0 }}>
+        Warranty runs from a job&apos;s completion date. You&apos;ll get a follow-up reminder 30 days before it expires.
+      </p>
+
       <hr className="divider" style={{ margin: "20px 0" }} />
       <h3 className="section-title" style={{ marginBottom: 6 }}>Client Proposal URL</h3>
       <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 0, marginBottom: 10 }}>

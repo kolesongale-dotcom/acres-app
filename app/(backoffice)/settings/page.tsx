@@ -48,6 +48,7 @@ export default async function SettingsPage() {
     proposalEmailTemplate: business?.proposalEmailTemplate ?? "",
     resourceInteriorUrl: business?.resourceInteriorUrl ?? "",
     resourceExteriorUrl: business?.resourceExteriorUrl ?? "",
+    warrantyMonths: business?.warrantyMonths ?? 24,
   };
 
   return (

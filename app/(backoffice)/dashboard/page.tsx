@@ -93,7 +93,37 @@ export default async function DashboardPage() {
       ageDays,
     }));
 
-  const followUps: FollowUpRow[] = [...autoFollowUps, ...manualFollowUps];
+  // Warranty follow-ups: jobs whose warranty expires within 30 days (an excuse to
+  // reach back out). Warranty end = completedAt + warrantyMonths (from settings).
+  const biz = await prisma.businessSettings.findUnique({ where: { id: 1 } });
+  const warrantyMonths = biz?.warrantyMonths ?? 24;
+  const completedJobs = await prisma.estimate.findMany({
+    where: { completedAt: { not: null } },
+    include: { customer: true },
+  });
+  const now = Date.now();
+  const warrantyFollowUps: FollowUpRow[] = completedJobs
+    .map((e) => {
+      const end = new Date(e.completedAt as Date);
+      end.setMonth(end.getMonth() + warrantyMonths);
+      const daysLeft = Math.ceil((end.getTime() - now) / 86400000);
+      return { e, end, daysLeft };
+    })
+    .filter((x) => x.daysLeft <= 30 && x.daysLeft >= -3) // window: 30 days before, small grace after
+    .sort((a, b) => a.daysLeft - b.daysLeft)
+    .map(({ e, end }) => ({
+      id: e.id,
+      note: `Warranty ending — ${e.projectName || "job"}`,
+      dueDate: end.toISOString(),
+      customerId: e.customerId ?? 0,
+      customerName: customerName(e.customer),
+      estimateId: e.id,
+      kind: "auto" as const,
+      href: `/estimates/${e.id}`,
+      subtitle: `Warranty ends ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
+    }));
+
+  const followUps: FollowUpRow[] = [...warrantyFollowUps, ...autoFollowUps, ...manualFollowUps];
 
   const metrics = [
     { label: "Pipeline Value", value: formatCurrency(totalValue), sub: `${cards.length} estimates` },

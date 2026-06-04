@@ -69,6 +69,7 @@ export default async function EstimateBuilderPage({
       status: estimate.status,
       startDate: estimate.startDate ? toDateInput(estimate.startDate) : null,
       endDate: estimate.endDate ? toDateInput(estimate.endDate) : null,
+      completedAt: estimate.completedAt ? toDateInput(estimate.completedAt) : null,
       durationDays: estimate.durationDays,
       taxRate: estimate.taxRate,
       discountType: estimate.discountType,
@@ -143,6 +144,7 @@ export default async function EstimateBuilderPage({
       materialItems={materialItems}
       currentRates={rd.rates}
       defaults={defaults}
+      warrantyMonths={settings?.warrantyMonths ?? 24}
     />
   );
 }

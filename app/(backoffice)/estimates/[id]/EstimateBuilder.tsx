@@ -22,6 +22,13 @@ interface TierConfig { midDepositPercent: number; midDepositDiscount: number; ma
 
 const TABS = ["Setup", "Rooms", "Cabinets", "Decks & Exteriors", "Photos", "Summary"];
 
+function warrantyEndLabel(completedAt: string, months: number): string {
+  const d = new Date(completedAt + "T00:00:00");
+  if (isNaN(d.getTime())) return "—";
+  d.setMonth(d.getMonth() + Math.max(0, Math.round(months)));
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
 function downscaleImage(file: File, maxDim = 1600, quality = 0.82): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -59,11 +66,12 @@ function listOps<T extends object>(setter: Dispatch<SetStateAction<T[]>>) {
 
 export default function EstimateBuilder({
   estimateId, estimateNumber, initial, customers, tierConfig, hasProposal, proposalId,
-  paintItems, materialItems, currentRates, defaults,
+  paintItems, materialItems, currentRates, defaults, warrantyMonths = 24,
 }: {
   estimateId: number; estimateNumber: string; initial: BuilderState; customers: CustomerOption[];
   tierConfig: TierConfig; hasProposal: boolean; proposalId: number | null;
   paintItems: PaintOption[]; materialItems: MaterialCatalogEntry[]; currentRates: JobRates; defaults: PaintDefaults;
+  warrantyMonths?: number;
 }) {
   const router = useRouter();
   const { success, error } = useToast();
@@ -228,6 +236,15 @@ export default function EstimateBuilder({
                 <Labeled label="Start"><input type="date" className="input" value={setup.startDate ?? ""} onChange={(e) => setSetupField("startDate", e.target.value || null)} /></Labeled>
                 <Labeled label="End"><input type="date" className="input" value={setup.endDate ?? ""} onChange={(e) => setSetupField("endDate", e.target.value || null)} /></Labeled>
                 <Labeled label="Days"><NumberField value={setup.durationDays} min={0} onChange={(v) => setSetupField("durationDays", v)} /></Labeled>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+                <Labeled label="Completed On"><input type="date" className="input" value={setup.completedAt ?? ""} onChange={(e) => setSetupField("completedAt", e.target.value || null)} /></Labeled>
+                <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+                  <span className="label">Warranty Ends</span>
+                  <div style={{ fontSize: 13.5, color: setup.completedAt ? "var(--accent)" : "var(--text-dim)", paddingTop: 6 }}>
+                    {setup.completedAt ? warrantyEndLabel(setup.completedAt, warrantyMonths) : "— set completion date —"}
+                  </div>
+                </div>
               </div>
             </div>
             <hr className="divider" style={{ margin: "22px 0" }} />

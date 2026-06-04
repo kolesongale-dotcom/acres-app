@@ -39,6 +39,7 @@ export async function updateBusinessSettings(input: {
   publicBaseUrl: string;
   resourceInteriorUrl?: string;
   resourceExteriorUrl?: string;
+  warrantyMonths?: number;
 }): Promise<ActionResult> {
   try {
     const clean = { ...input, publicBaseUrl: input.publicBaseUrl.trim() };

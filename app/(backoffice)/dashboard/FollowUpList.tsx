@@ -19,6 +19,7 @@ export interface FollowUpRow {
   kind?: "manual" | "auto";
   href?: string;
   ageDays?: number;
+  subtitle?: string; // auto rows: overrides the default "Awaiting response Nd" line
 }
 
 export default function FollowUpList({ items }: { items: FollowUpRow[] }) {
@@ -90,7 +91,7 @@ export default function FollowUpList({ items }: { items: FollowUpRow[] }) {
                 {" · "}
                 <span style={{ color: overdue ? "#f87171" : isAuto ? "var(--warning)" : "var(--text-dim)" }}>
                   {isAuto
-                    ? `Awaiting response ${f.ageDays ?? 14}d`
+                    ? (f.subtitle ?? `Awaiting response ${f.ageDays ?? 14}d`)
                     : overdue
                     ? `Overdue ${daysSince(f.dueDate)}d`
                     : `Due ${formatDate(f.dueDate)}`}
