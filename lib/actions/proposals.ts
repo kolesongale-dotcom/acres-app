@@ -7,7 +7,7 @@ import { ensureBudgetEntry } from "@/lib/actions/estimates";
 import { ESTIMATE_INCLUDE, toFullEstimateInput } from "@/lib/estimateCalc";
 import { getPaintCatalog } from "@/lib/priceCatalog";
 import { getCurrentRatesAndDefaults } from "@/lib/jobRates";
-import { extractPaintSlots, isValidSlotField, sheenFieldFor, type PaintSlotKind, type PaintSlotRef } from "@/lib/paintSlots";
+import { extractPaintSlots, isValidSlotField, sheenFieldFor, slotKey, type PaintSlotKind, type PaintSlotRef } from "@/lib/paintSlots";
 import { SHEEN_OPTIONS } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 
@@ -118,6 +118,21 @@ export async function selectSheenPublic(
   }
 }
 
+/** Snapshot the estimator's effective paint pick per client-selectable surface. */
+async function captureRecommended(estimateId: number): Promise<Record<string, number>> {
+  const [est, catalog, rd] = await Promise.all([
+    prisma.estimate.findUnique({ where: { id: estimateId }, include: ESTIMATE_INCLUDE }),
+    getPaintCatalog(),
+    getCurrentRatesAndDefaults(),
+  ]);
+  const recommended: Record<string, number> = {};
+  if (est) {
+    const slots = extractPaintSlots(toFullEstimateInput(est as any, catalog, rd.defaults), catalog);
+    for (const s of slots) recommended[slotKey(s.ref)] = s.currentPaintId;
+  }
+  return recommended;
+}
+
 /** Create a proposal for an estimate, or return the existing one. */
 export async function generateProposal(
   estimateId: number
@@ -125,6 +140,14 @@ export async function generateProposal(
   try {
     const existing = await prisma.proposal.findUnique({ where: { estimateId } });
     if (existing) {
+      // Self-heal: backfill the recommendation snapshot if an older proposal
+      // never captured one (and the client hasn't signed/changed paints yet).
+      if ((!existing.recommendedPaints || existing.recommendedPaints === "{}") && !existing.signedAt) {
+        const recommended = await captureRecommended(estimateId);
+        if (Object.keys(recommended).length) {
+          await prisma.proposal.update({ where: { id: existing.id }, data: { recommendedPaints: JSON.stringify(recommended) } });
+        }
+      }
       return { success: true, data: { id: existing.id } };
     }
 
@@ -144,16 +167,7 @@ export async function generateProposal(
     const includedSOPs = JSON.stringify(defaults.map((d) => d.id));
 
     // Snapshot the estimator's current paint pick per surface as the recommendation.
-    const [est, catalog, rd] = await Promise.all([
-      prisma.estimate.findUnique({ where: { id: estimateId }, include: ESTIMATE_INCLUDE }),
-      getPaintCatalog(),
-      getCurrentRatesAndDefaults(),
-    ]);
-    const recommended: Record<string, number> = {};
-    if (est) {
-      const slots = extractPaintSlots(toFullEstimateInput(est as any, catalog, rd.defaults), catalog);
-      for (const s of slots) recommended[`${s.ref.kind}:${s.ref.id}:${s.ref.field}`] = s.currentPaintId;
-    }
+    const recommended = await captureRecommended(estimateId);
 
     const proposal = await prisma.proposal.create({
       data: { proposalNumber, estimateId, includedSOPs, recommendedPaints: JSON.stringify(recommended) },
