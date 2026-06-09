@@ -15,7 +15,7 @@ import { createZohoInvoiceDraft } from "@/lib/actions/zoho";
 interface Payment { id: number; amount: number; paidAt: string; note: string }
 interface Invoice {
   id: number; number: string; tierLabel: string; subtotal: number; total: number;
-  dueDate: string; notes: string; estimateId: number; proposalId: number | null;
+  dueDate: string; notes: string; paymentLink: string; estimateId: number; proposalId: number | null;
   lineItems: { name: string; total: number }[]; payments: Payment[];
 }
 
@@ -33,6 +33,7 @@ export default function InvoiceDetail({
 
   const [dueDate, setDueDate] = useState(invoice.dueDate.slice(0, 10));
   const [notes, setNotes] = useState(invoice.notes);
+  const [paymentLink, setPaymentLink] = useState(invoice.paymentLink ?? "");
   const [metaDirty, setMetaDirty] = useState(false);
 
   const [payAmount, setPayAmount] = useState<number>(0);
@@ -51,7 +52,7 @@ export default function InvoiceDetail({
 
   function saveMeta() {
     start(async () => {
-      const res = await updateInvoice(invoice.id, { dueDate, notes });
+      const res = await updateInvoice(invoice.id, { dueDate, notes, paymentLink });
       if (res.success) { success("Invoice updated."); setMetaDirty(false); router.refresh(); }
       else error(res.error);
     });
@@ -73,6 +74,7 @@ export default function InvoiceDetail({
     });
   }
 
+  const payLink = paymentLink.trim();
   const subject = `Invoice ${invoice.number} — ${project}`;
   const emailBody =
     `Hi ${client},\n\n` +
@@ -80,6 +82,7 @@ export default function InvoiceDetail({
     `Total due: ${formatCurrency(invoice.total)}\n` +
     (paid > 0 ? `Paid to date: ${formatCurrency(paid)}\nBalance remaining: ${formatCurrency(remaining)}\n` : "") +
     `Due by: ${formatDate(invoice.dueDate)}\n\n` +
+    (payLink ? `Pay online: ${payLink}\n\n` : "") +
     `Thank you for your business!\n\n${companyName}`;
   const mailtoHref = `mailto:${encodeURIComponent(clientEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
 
@@ -192,8 +195,24 @@ export default function InvoiceDetail({
             </div>
           </div>
           <div className="card">
-            <h2 className="section-title" style={{ marginBottom: 12 }}>Payment Due Date</h2>
+            <h2 className="section-title" style={{ marginBottom: 12 }}>Payment & Due Date</h2>
+            <label className="label">Due Date</label>
             <input type="date" className="input" value={dueDate} onChange={(e) => { setDueDate(e.target.value); setMetaDirty(true); }} />
+            <label className="label" style={{ marginTop: 12 }}>Payment Link</label>
+            <input
+              className="input"
+              type="url"
+              inputMode="url"
+              placeholder="https://… (QuickBooks, Stripe, etc.)"
+              value={paymentLink}
+              onChange={(e) => { setPaymentLink(e.target.value); setMetaDirty(true); }}
+            />
+            <p style={{ fontSize: 12, color: "var(--text-dim)", margin: "6px 0 0" }}>
+              When set, it's added to the Zoho draft and email so clients can pay online.
+            </p>
+            {paymentLink.trim() && (
+              <a href={paymentLink.trim()} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm" style={{ marginTop: 8 }}>Open link ↗</a>
+            )}
             <button className="btn btn-primary" style={{ width: "100%", marginTop: 12 }} disabled={!metaDirty} onClick={saveMeta}>
               {metaDirty ? "Save Changes" : "Saved ✓"}
             </button>

@@ -99,10 +99,31 @@ If it didn't, set **Custom Start Command** = `npm run start:prod`.
 
 ---
 
+## ⚠️ NEVER reset the production database
+This is the one rule that can lose all of your business data, so it gets its own section.
+
+- **`prisma migrate reset` (and the `npm run db:reset` shortcut) DROPS EVERY TABLE and
+  recreates the database empty.** It is a local-development-only command. Never run it
+  against the cloud / production database (`DATABASE_URL` pointing at `/data/dev.db`).
+- **Production only ever runs `prisma migrate deploy`** (it's baked into `start:prod`). That
+  applies any new migrations without touching existing data.
+- **If a migration fails on deploy:** do NOT reset. Fix the migration file in
+  `prisma/migrations/<name>/migration.sql` (or create a corrective migration locally with
+  `prisma migrate dev`), commit, and redeploy. Resetting to "make the error go away" deletes
+  everything.
+- **Before any risky database operation**, take a backup first: **Settings → Data Backup →
+  Export All Data** (full JSON copy). It only takes a second.
+
+---
+
 ## Backups (do this occasionally — it's your business data)
 Your cloud data is the single SQLite file `/data/dev.db` plus the `/data/uploads` folder.
-- Easiest backup: in the app, **Settings → Data Export** downloads your records as Excel.
-- For a full database copy, use the Railway dashboard's volume/CLI tools to download
+- **Best / easiest backup:** in the app, **Settings → Data Backup → Export All Data**. This
+  downloads a complete copy of every table as one JSON file (`acres-backup-<date>.json`). To
+  restore, use **Import from Backup** on the same screen — it puts every record back with its
+  original ID. Do this before any deploy that changes the database.
+- Excel export (**Settings → Data Export**) is for accounting/printing, not restore.
+- For a raw database copy, use the Railway dashboard's volume/CLI tools to download
   `/data/dev.db`. (Ask Claude to walk you through the Railway CLI when you want this.)
 
 ---

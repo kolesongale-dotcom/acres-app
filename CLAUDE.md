@@ -52,7 +52,9 @@ app/
     budget/     [estimateId]/    # overview (accepted only) + estimated-vs-actual detail
     settings/                    # 5 tabs: company, business (deposit tiers), email, SOPs, data export
   proposals/[id]/sign/           # PUBLIC client-facing signing page (NO sidebar, light theme)
-  api/export/                    # GET ?type=customers|estimates|proposals|all → .xlsx download
+  api/export/                    # GET ?type=customers|estimates|proposals|invoices|payments|
+                                 #   changeorders|colorsheets|pricebook|budget|followups|all → .xlsx
+                                 #   (each type = one sheet; "all" = every sheet in one workbook)
 components/                      # Sidebar, StatusBadge, Modal, ConfirmDialog, LoadingSpinner,
                                  # EmptyState, TotalsPanel, PageHeader, Toast
 lib/
@@ -110,6 +112,14 @@ defaults)` call so inherited paints resolve.
   `{priceBookItemId,name,unit,quantity,unitCost,markup}`). Their cost rolls into THAT item's total
   and is removed with the item. **Overhead** (`OverheadItem`) stays project-wide; project-wide
   ad-hoc `EstimateLineItem`s remain too.
+- **Special Projects** (`SpecialProject` + `SpecialProjectFile`, builder tab between Decks & Exteriors
+  and Photos): one-off work with a **flat manual price — NO rates, NO markup**. `specialProjectBuilt`
+  emits one line at `quantity 1 × price` (category **Other** → totals' Other bucket) plus its own
+  Price-Book `materials` (each with its own markup). Renders as its own `ServiceRow` (category "Special
+  Project") so it flows into the estimate Summary, sign page, and PDF like any other item. Has free-text
+  `description` (shown on proposal) + internal `notes`, and **photo/file attachments** (`SpecialProjectFile`,
+  `fileType` image|file) uploaded to the `special/` folder. **`/api/upload` accepts non-image files only
+  for the `special` folder** (`FILE_FOLDERS`); other folders stay image-only.
 - **Grouped services**: `computeAll(input)` returns `{ services, lines, totals }`. `services` is one
   `ServiceRow` per item — `{ name, qtyLabel, subtitle, total }` — used by the estimate Summary, the
   client sign page, and the PDF (collapsed "name + total" quote with a gray subtitle). `lines` is the
@@ -130,7 +140,18 @@ and client-side in the builder. Pass it everywhere `computeEstimate(est, catalog
 
 **Labor** (rates come from the snapshot `JobRates`, billed at `laborMarkup`, category Labor):
 - Rooms: wall `2*(L+W)*H − openings + wallSqftAdjust`, ceiling `L*W + ceilingSqftAdjust`, trim
-  `perimeter + Σ openingTrim + trimLfAdjust`. Manual `+/-` adjusts are **per room, per surface**
+  `perimeter + Σ openingTrim + trimLfAdjust`. **Perimeter Walk mode** (`Room.measureMode="perimeter"`,
+  wall segments in `Room.wallsJson` as `[{feet,inches}]`): instead of L×W the engine derives perimeter
+  = Σ segment lengths, **wall gross = perimeter × height**, and **ceiling = auto-solved shoelace area**.
+  `solvePerimeter` (in `lib/calculations.ts`, used by `perimeterCeilingArea`) reconstructs the
+  rectilinear (all-90°) room from lengths *alone* — no turn/geometry input. Since a closed orthogonal
+  polygon's edges alternate horizontal/vertical, it fixes edge 0 pointing East and brute-forces the
+  sign (+/−) of every other edge (2^(N-1), capped at 16 walls); a combination "closes" when ΣX = ΣY = 0,
+  and among closing combinations it keeps the **largest-area** one (the natural room shape). Needs an
+  even count ≥ 4 with all positive lengths, else it doesn't close. The manual `+/-` adjusts still apply
+  on top in both modes. UI: a Simple/Perimeter toggle per room card; each wall row is just feet+inches
+  fields (no turn UI); live perimeter / ceiling sq ft / wall sq ft readout; min 3 walls; the warning
+  "These walls don't close — check your measurements" when no closing shape exists. Manual `+/-` adjusts are **per room, per surface**
   (signed). Openings (door/window/custom) subtract their area from walls; if `includeTrim`, they add
   trim LF (**door = W + 2H**, window/custom = `2(W+H)`). Accent walls are separate lines.
   Cabinets: doors×$door + drawers×$drawer + frames×$frame. Decks: floor $/sf + railing $/lf (toggle) +
@@ -316,12 +337,44 @@ proposal → `generateInvoice(estimateId)` mints `INV-0001`, snapshots the **acc
 breakdown + overhead) so the invoice is a stable document. Default due date = +14 days (editable).
 - Status is **derived** (`lib/invoiceStatus.ts`): Paid / Partial / Unpaid / Overdue from total vs.
   sum(payments) vs. due date. No status column.
+- List page (`/invoices`): summary cards (Invoices / Collected / **Outstanding** = Σ balances) + a
+  **Balance Due** column (`total − Σ payments`), shown **red when the row is Overdue** (balance > 0 and
+  past due), green when fully paid.
 - Payments are logged manually (`addPayment`: amount + date + note; supports deposit → balance and
   extra partials). Paid = Σ payments; remaining = total − paid.
 - PDF: `lib/invoicePdf.ts` (pdfkit, mirrors proposalPdf) at `GET /api/invoices/[id]/pdf`. Zoho:
-  `createZohoInvoiceDraft` (attaches the invoice PDF), mirroring the proposal Zoho flow.
-- Actions in `lib/actions/invoices.ts`. Detail page: line items, payments, due-date + notes editors,
-  ↓ PDF, Draft to Zoho, Delete.
+  `createZohoInvoiceDraft` (attaches the invoice PDF), mirroring the proposal Zoho flow. The "Draft to
+  Zoho" button on the detail page calls it with the invoice email body; the button shows "Connect Zoho"
+  instead when `ZohoConfig.connected` is false, and is disabled when the client has no email.
+- **Payment link** (`Invoice.paymentLink`, optional URL — QuickBooks/Stripe/etc., editable in the
+  detail "Payment & Due Date" card via `updateInvoice`): when set, it's appended to the Zoho draft +
+  mailto email body ("Pay online: …") and printed as a clickable link near the bottom of the invoice
+  PDF (only while a balance remains).
+- Actions in `lib/actions/invoices.ts`. Detail page: line items, payments, due-date + notes + payment
+  link editors, ↓ PDF, Draft to Zoho, Delete.
+
+## Full data backup / restore (`lib/backup.ts`)
+
+A complete-database JSON backup, separate from the Excel export (which is read-only/accounting).
+- **Export:** `GET /api/admin/export` streams `acres-backup-<date>.json` — every table dumped (ordered
+  by id) plus `schemaVersion` (`SCHEMA_VERSION`, a date string) + `exportedAt`. Auth-gated by
+  middleware (under `/api/admin/*`, not in the public allow-list).
+- **Import:** `POST /api/admin/import` accepts the file (multipart `file=` from the UI, or a raw JSON
+  body), validates shape (`isValidBackup`), then `importAllData` **upserts every row by id inside one
+  transaction** (120s timeout) so it's atomic and **preserves original ids**. Returns per-table counts
+  + `total` + `schemaMatch`. Upsert (not insert) means a partial re-import never duplicates; it
+  overwrites same-id rows but does NOT delete rows missing from the backup (restore/merge, not wipe).
+- **Order matters:** `TABLES` in `lib/backup.ts` lists every model in FK-dependency order (settings/
+  reference → customers → estimates → estimate children → follow-ups → proposals/budget/invoices/
+  payments/change-orders/color-selections). Date columns are listed per-table and revived ISO→`Date`
+  on import. To add a model: add a `TABLES` entry (correct position) + its `dateFields`.
+- **UI:** Settings → **Data Export** tab, "Data Backup" card (`DataBackupSection` in `SettingsClient.tsx`):
+  Export All Data (records last-export time in `localStorage["acres:lastBackup"]`), Import from Backup
+  (file picker → danger ConfirmDialog → POST → per-table restored-count summary, warns on schema
+  mismatch).
+- **Safety:** `package.json` `//DANGER` script note + `DEPLOY.md` warn never to run
+  `prisma migrate reset`/`db:reset` against production (drops all data) — prod only runs
+  `prisma migrate deploy`; fix the migration file if one fails, never reset.
 
 ## Cloud deployment (Railway) + auth
 

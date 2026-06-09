@@ -86,6 +86,71 @@ export interface ServiceRow {
 export function wallArea(l: number, w: number, h: number): number { return 2 * (n(l) + n(w)) * n(h); }
 export function ceilingArea(l: number, w: number): number { return n(l) * n(w); }
 export function perimeter(l: number, w: number): number { return 2 * (n(l) + n(w)); }
+
+// --- perimeter-walk geometry (rectilinear polygon from feet+inches wall segments) ---
+// The user just walks the room and types each wall's length (feet + inches) in
+// order — no turn/geometry knowledge required. `solvePerimeter` reconstructs the
+// shape automatically: in a closed all-90° polygon the edges alternate horizontal
+// /vertical, so we fix edge 0 pointing East (+x) and brute-force the sign (+/−) of
+// every other edge. A combination "closes" when ΣX = 0 and ΣY = 0; among all
+// closing combinations we keep the one with the largest shoelace area (the most
+// natural room shape). No closing combination ⇒ the measurements don't add up.
+export interface WallSegment { feet: number; inches: number }
+
+/** One wall segment's length in decimal feet (feet + inches/12, clamped ≥ 0). */
+export function segmentFeet(w: WallSegment | undefined): number {
+  return Math.max(0, n(w?.feet)) + Math.max(0, n(w?.inches)) / 12;
+}
+/** Total perimeter (lf) = sum of all segment lengths. */
+export function perimeterFeet(walls: WallSegment[] | undefined): number {
+  return (walls ?? []).reduce((s, w) => s + segmentFeet(w), 0);
+}
+
+// Above this many walls the 2^(N-1) brute force is skipped (rooms never get this
+// big; keeps live recompute instant).
+const SOLVE_MAX_WALLS = 16;
+/**
+ * Auto-solve the rectilinear room from wall lengths alone. Returns whether a
+ * closing shape exists and its ceiling/floor area (sf, max over closing shapes).
+ * A valid closed orthogonal polygon needs an even count ≥ 4 (edges alternate
+ * H/V), and every wall must have positive length.
+ */
+export function solvePerimeter(walls: WallSegment[] | undefined): { closes: boolean; area: number } {
+  const lens = (walls ?? []).map(segmentFeet);
+  const N = lens.length;
+  if (N < 4 || N % 2 === 1 || N > SOLVE_MAX_WALLS || lens.some((l) => l <= 0)) {
+    return { closes: false, area: 0 };
+  }
+  const tol = 1 / 12; // 1 inch
+  let bestArea = -1;
+  const free = N - 1; // edge 0 is fixed +x (East); edges 1..N-1 each get a sign bit
+  const combos = 1 << free;
+  for (let mask = 0; mask < combos; mask++) {
+    let x = 0, y = 0;
+    const xs: number[] = new Array(N), ys: number[] = new Array(N);
+    for (let i = 0; i < N; i++) {
+      xs[i] = x; ys[i] = y;
+      const sign = i === 0 ? 1 : (mask >> (i - 1)) & 1 ? 1 : -1;
+      if (i % 2 === 0) x += sign * lens[i]; // even edge → horizontal
+      else y += sign * lens[i];             // odd edge  → vertical
+    }
+    if (Math.abs(x) <= tol && Math.abs(y) <= tol) {
+      let sum = 0;
+      for (let i = 0; i < N; i++) {
+        const j = (i + 1) % N;
+        sum += xs[i] * ys[j] - xs[j] * ys[i];
+      }
+      const area = Math.abs(sum) / 2;
+      if (area > bestArea) bestArea = area;
+    }
+  }
+  return bestArea >= 0 ? { closes: true, area: bestArea } : { closes: false, area: 0 };
+}
+
+/** Ceiling/floor area (sf) of the auto-solved room (0 when it doesn't close). */
+export function perimeterCeilingArea(walls: WallSegment[] | undefined): number {
+  return solvePerimeter(walls).area;
+}
 export function deductionArea(d: { width: number; height: number }[]): number {
   return (d ?? []).reduce((s, x) => s + n(x.width) * n(x.height), 0);
 }
@@ -160,6 +225,8 @@ function materialLines(materials: ItemMaterialInput[], source: string): CalcLine
 // ---------------------------------------------------------------------------
 export interface RoomInput {
   id?: number; name: string; length: number; width: number; height: number;
+  measureMode?: string;            // "simple" (L×W) | "perimeter" (wall segments)
+  walls?: WallSegment[];           // perimeter-mode wall list (feet + inches each)
   paintWalls: boolean; paintCeiling: boolean; paintTrim: boolean;
   wallCoats: number; ceilingCoats: number; trimCoats: number;
   wallSqftAdjust: number; ceilingSqftAdjust: number; trimLfAdjust: number;
@@ -199,6 +266,9 @@ export interface CustomAreaInput {
   id?: number; label: string; measureType: string; amount: number; rate: number; coats: number;
   paintId?: number | null; primer: PrimerInput; materials: ItemMaterialInput[];
 }
+export interface SpecialProjectInput {
+  id?: number; name: string; description?: string; price: number; materials: ItemMaterialInput[];
+}
 
 // --- helpers to build a single component's lines + service row ---
 function laborLine(description: string, quantity: number, unitCost: number, markup: number, source: string): CalcLineItem {
@@ -219,11 +289,16 @@ function buildService(key: string, name: string, qtyLabel: string, subtitle: str
 // ---------------------------------------------------------------------------
 function roomBuilt(r: RoomInput, rates: JobRates, catalog: PaintCatalog): Built {
   const src = `room:${r.id ?? r.name}`;
-  const gross = wallArea(r.length, r.width, r.height);
+  const isPerim = r.measureMode === "perimeter";
+  // Perimeter mode derives the room's footprint from the entered wall segments
+  // (rectilinear shoelace); Simple mode uses length × width.
+  const perim = isPerim ? perimeterFeet(r.walls) : perimeter(r.length, r.width);
+  const gross = isPerim ? perim * n(r.height) : wallArea(r.length, r.width, r.height);
+  const ceilingBase = isPerim ? perimeterCeilingArea(r.walls) : ceilingArea(r.length, r.width);
   const netWall = Math.max(0, gross - deductionArea(r.deductions ?? []) + n(r.wallSqftAdjust));
-  const ceiling = Math.max(0, ceilingArea(r.length, r.width) + n(r.ceilingSqftAdjust));
+  const ceiling = Math.max(0, ceilingBase + n(r.ceilingSqftAdjust));
   const openings = (r.deductions ?? []).reduce((s, d) => s + (d.includeTrim ? openingTrim(d.kind, d.width, d.height) : 0), 0);
-  const trimLf = Math.max(0, perimeter(r.length, r.width) + openings + n(r.trimLfAdjust));
+  const trimLf = Math.max(0, perim + openings + n(r.trimLfAdjust));
   const m = n(rates.laborMarkup);
   const lines: CalcLineItem[] = [];
   const parts: string[] = [];
@@ -257,7 +332,10 @@ function roomBuilt(r: RoomInput, rates: JobRates, catalog: PaintCatalog): Built 
   const hasPrimer = [r.wallPrimer, r.ceilingPrimer, r.trimPrimer].some((p) => p && p.paintId != null);
   if (hasPrimer) parts.push("Primer applied");
   lines.push(...materialLines(r.materials, src));
-  const subtitle = `${parts.join(", ")}. Dimensions: ${formatNumber(r.length)}'×${formatNumber(r.width)}'×${formatNumber(r.height)}'.`;
+  const dims = isPerim
+    ? `Perimeter ${formatNumber(perim)} lf, ceiling ${formatNumber(ceilingBase)} sf, ${formatNumber(r.height)}' high (${(r.walls ?? []).length} walls).`
+    : `Dimensions: ${formatNumber(r.length)}'×${formatNumber(r.width)}'×${formatNumber(r.height)}'.`;
+  const subtitle = `${parts.join(", ")}. ${dims}`;
   return buildService(src, r.name, "1 room", subtitle, lines, "Interior");
 }
 
@@ -394,6 +472,19 @@ function customBuilt(c: CustomAreaInput, rates: JobRates, catalog: PaintCatalog)
   return buildService(src, c.label, `1 area`, subtitle, lines, "Custom");
 }
 
+function specialProjectBuilt(sp: SpecialProjectInput, _rates: JobRates, _catalog: PaintCatalog): Built {
+  const src = `special:${sp.id ?? sp.name}`;
+  const lines: CalcLineItem[] = [];
+  // Flat manual price — no rates, no markup. Bucketed as "Other" in the totals.
+  if (n(sp.price) > 0) {
+    lines.push({ description: sp.name || "Special Project", category: "Other", quantity: 1, unitCost: n(sp.price), markup: 0, source: src });
+  }
+  // Materials carry their own per-item cost + markup (same as every other item).
+  lines.push(...materialLines(sp.materials, src));
+  const subtitle = (sp.description ?? "").trim();
+  return buildService(src, sp.name || "Special Project", "1 project", subtitle, lines, "Special Project");
+}
+
 // ---------------------------------------------------------------------------
 // Totals & tiers
 // ---------------------------------------------------------------------------
@@ -452,6 +543,7 @@ export interface FullEstimateInput {
   rates: JobRates; taxRate: number; discountType: string; discountValue: number;
   rooms: RoomInput[]; cabinetSets: CabinetInput[]; deckAreas: DeckInput[]; exteriorHouses: ExteriorHouseInput[];
   exteriorDoors: DoorInput[]; exteriorShutters: ShutterInput[]; garageDoors: GarageInput[]; customAreas: CustomAreaInput[];
+  specialProjects?: SpecialProjectInput[];
   lineItems: CalcLineItem[]; overheadItems: OverheadInput[]; paintCatalog?: PaintCatalog;
 }
 
@@ -467,6 +559,7 @@ export function computeAll(est: FullEstimateInput): { services: ServiceRow[]; li
   for (const s of est.exteriorShutters ?? []) built.push(shutterBuilt(s, rates, catalog));
   for (const g of est.garageDoors ?? []) built.push(garageBuilt(g, rates, catalog));
   for (const c of est.customAreas ?? []) built.push(customBuilt(c, rates, catalog));
+  for (const sp of est.specialProjects ?? []) built.push(specialProjectBuilt(sp, rates, catalog));
 
   const services: ServiceRow[] = [];
   const lines: CalcLineItem[] = [];

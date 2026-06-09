@@ -140,6 +140,7 @@ export async function saveEstimate(
       await tx.exteriorShutter.deleteMany({ where: { estimateId: id } });
       await tx.exteriorGarageDoor.deleteMany({ where: { estimateId: id } });
       await tx.customArea.deleteMany({ where: { estimateId: id } });
+      await tx.specialProject.deleteMany({ where: { estimateId: id } }); // cascades to files
       await tx.estimatePhoto.deleteMany({ where: { estimateId: id } });
       await tx.estimateLineItem.deleteMany({ where: { estimateId: id } });
       await tx.overheadItem.deleteMany({ where: { estimateId: id } });
@@ -154,6 +155,8 @@ export async function saveEstimate(
             length: r.length,
             width: r.width,
             height: r.height,
+            measureMode: r.measureMode ?? "simple",
+            wallsJson: JSON.stringify(r.walls ?? []),
             paintWalls: r.paintWalls,
             paintCeiling: r.paintCeiling,
             paintTrim: r.paintTrim,
@@ -388,6 +391,29 @@ export async function saveEstimate(
             primerSqftAdjust: c.primerSqftAdjust,
             materials: JSON.stringify(c.materials ?? []),
             sortOrder: i,
+          },
+        });
+      }
+
+      // Special projects (flat price + per-item materials + file attachments)
+      for (let i = 0; i < (payload.specialProjects ?? []).length; i++) {
+        const sp = payload.specialProjects[i];
+        await tx.specialProject.create({
+          data: {
+            estimateId: id,
+            name: sp.name,
+            description: sp.description,
+            price: sp.price,
+            notes: sp.notes,
+            materials: JSON.stringify(sp.materials ?? []),
+            sortOrder: i,
+            files: {
+              create: (sp.files ?? []).map((f) => ({
+                url: f.url,
+                caption: f.caption,
+                fileType: f.fileType,
+              })),
+            },
           },
         });
       }

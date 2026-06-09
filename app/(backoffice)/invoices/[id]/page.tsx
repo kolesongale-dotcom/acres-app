@@ -47,6 +47,7 @@ export default async function InvoiceDetailPage({
         total: invoice.total,
         dueDate: invoice.dueDate.toISOString(),
         notes: invoice.notes,
+        paymentLink: invoice.paymentLink ?? "",
         estimateId: invoice.estimateId,
         proposalId: invoice.proposalId,
         lineItems,

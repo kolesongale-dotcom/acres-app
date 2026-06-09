@@ -137,7 +137,7 @@ export async function buildInvoice(proposalId: number, changeOrderId: number | n
 
 export async function updateInvoice(
   id: number,
-  input: { dueDate?: string; notes?: string }
+  input: { dueDate?: string; notes?: string; paymentLink?: string }
 ): Promise<ActionResult> {
   try {
     await prisma.invoice.update({
@@ -145,6 +145,7 @@ export async function updateInvoice(
       data: {
         ...(input.dueDate !== undefined && { dueDate: new Date(input.dueDate) }),
         ...(input.notes !== undefined && { notes: input.notes }),
+        ...(input.paymentLink !== undefined && { paymentLink: input.paymentLink.trim() }),
       },
     });
     revalidatePath(`/invoices/${id}`);

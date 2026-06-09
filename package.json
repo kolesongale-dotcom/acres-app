@@ -12,6 +12,7 @@
     "start:prod": "prisma migrate deploy && prisma db seed && next start",
     "postinstall": "prisma generate",
     "db:seed": "prisma db seed",
+    "//DANGER": "NEVER run db:reset (prisma migrate reset) against production/cloud — it DROPS ALL DATA. Production only ever runs `prisma migrate deploy` (see start:prod). If a migration fails on deploy, fix the migration file and redeploy; do NOT reset. Take a Settings → Data Backup export before any risky DB operation.",
     "db:reset": "prisma migrate reset --force"
   },
   "prisma": {

@@ -14,7 +14,7 @@ export const UPLOAD_DIR = process.env.UPLOAD_DIR
   : path.join(process.cwd(), "uploads");
 
 /** Allowed upload sub-folders (prevents writing outside the upload root). */
-export const UPLOAD_FOLDERS = new Set(["estimates", "branding", "resources"]);
+export const UPLOAD_FOLDERS = new Set(["estimates", "branding", "resources", "special"]);
 
 /**
  * Map a stored URL like "/uploads/branding/abc.png" to an absolute filesystem
@@ -47,7 +47,29 @@ export function contentTypeFor(filePath: string): string {
       return "image/svg+xml";
     case ".jpg":
     case ".jpeg":
-    default:
       return "image/jpeg";
+    // Non-image attachments (Special Project files).
+    case ".pdf":
+      return "application/pdf";
+    case ".txt":
+      return "text/plain; charset=utf-8";
+    case ".csv":
+      return "text/csv; charset=utf-8";
+    case ".doc":
+      return "application/msword";
+    case ".docx":
+      return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    case ".xls":
+      return "application/vnd.ms-excel";
+    case ".xlsx":
+      return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    default:
+      return "application/octet-stream";
   }
+}
+
+/** A short, lowercase, safe file extension (without the dot) from a filename. */
+export function safeExt(filename: string, fallback = "bin"): string {
+  const ext = path.extname(filename || "").replace(/^\./, "").toLowerCase();
+  return /^[a-z0-9]{1,8}$/.test(ext) ? ext : fallback;
 }

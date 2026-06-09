@@ -148,6 +148,8 @@ export interface RoomPayload {
   length: number;
   width: number;
   height: number;
+  measureMode: string; // "simple" (length×width) | "perimeter" (wall segments)
+  walls: { feet: number; inches: number }[]; // auto-solved rectilinear room
   paintWalls: boolean;
   paintCeiling: boolean;
   paintTrim: boolean;
@@ -186,6 +188,24 @@ export interface RoomPayload {
     product: string;
     paintId: number | null;
   }[];
+}
+
+export interface SpecialProjectFilePayload {
+  id?: number;
+  url: string;
+  caption: string;
+  fileType: string; // "image" | "file"
+}
+
+export interface SpecialProjectPayload {
+  id?: number;
+  name: string;
+  description: string;
+  price: number;
+  notes: string;
+  materials: ItemMaterialPayload[];
+  files: SpecialProjectFilePayload[];
+  sortOrder: number;
 }
 
 export interface CabinetPayload {
@@ -391,6 +411,7 @@ export interface FullEstimatePayload {
   exteriorShutters: ShutterPayload[];
   garageDoors: GaragePayload[];
   customAreas: CustomAreaPayload[];
+  specialProjects: SpecialProjectPayload[];
   lineItems: LineItemPayload[];
   overheadItems: OverheadPayload[];
   photos: PhotoPayload[];

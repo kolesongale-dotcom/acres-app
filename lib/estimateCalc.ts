@@ -19,6 +19,7 @@ export const ESTIMATE_INCLUDE = {
   exteriorShutters: { orderBy: { sortOrder: "asc" as const } },
   garageDoors: { orderBy: { sortOrder: "asc" as const } },
   customAreas: { orderBy: { sortOrder: "asc" as const } },
+  specialProjects: { orderBy: { sortOrder: "asc" as const }, include: { files: { orderBy: { id: "asc" as const } } } },
   photos: { orderBy: { sortOrder: "asc" as const } },
   lineItems: { orderBy: { sortOrder: "asc" as const } },
   overheadItems: { orderBy: { sortOrder: "asc" as const } },
@@ -44,6 +45,17 @@ function parseMaterials(json: string | null | undefined): ItemMaterialInput[] {
   }
 }
 
+function parseWalls(json: string | null | undefined): { feet: number; inches: number }[] {
+  if (!json) return [];
+  try {
+    const arr = JSON.parse(json);
+    if (!Array.isArray(arr)) return [];
+    return arr.map((w: any) => ({ feet: Number(w.feet) || 0, inches: Number(w.inches) || 0 }));
+  } catch {
+    return [];
+  }
+}
+
 export function toFullEstimateInput(est: any, paintCatalog: PaintCatalog = {}, defaults: PaintDefaults = NO_DEFAULTS): FullEstimateInput {
   return {
     rates: parseRatesSnapshot(est.ratesSnapshot),
@@ -51,6 +63,7 @@ export function toFullEstimateInput(est: any, paintCatalog: PaintCatalog = {}, d
     paintCatalog,
     rooms: (est.rooms ?? []).map((r: any) => ({
       id: r.id, name: r.name, length: r.length, width: r.width, height: r.height,
+      measureMode: r.measureMode ?? "simple", walls: parseWalls(r.wallsJson),
       paintWalls: r.paintWalls, paintCeiling: r.paintCeiling, paintTrim: r.paintTrim,
       wallCoats: r.wallCoats, ceilingCoats: r.ceilingCoats, trimCoats: r.trimCoats,
       wallSqftAdjust: r.wallSqftAdjust ?? 0, ceilingSqftAdjust: r.ceilingSqftAdjust ?? 0, trimLfAdjust: r.trimLfAdjust ?? 0,
@@ -71,6 +84,7 @@ export function toFullEstimateInput(est: any, paintCatalog: PaintCatalog = {}, d
     exteriorShutters: (est.exteriorShutters ?? []).map((s: any) => ({ id: s.id, name: s.name, story1: s.story1 ?? 0, story2: s.story2 ?? 0, story3: s.story3 ?? 0, customQty: s.customQty ?? 0, customRate: s.customRate ?? 0, coats: s.coats ?? 2, paintId: eff(s.paintId, defaults.defaultShutterPaintId), primer: primer(s.primerPaintId, s.primerCoats, s.primerSqftAdjust), materials: parseMaterials(s.materials) })),
     garageDoors: (est.garageDoors ?? []).map((g: any) => ({ id: g.id, name: g.name, count: g.count, width: g.width, height: g.height, coats: g.coats ?? 2, paintId: eff(g.paintId, defaults.defaultGaragePaintId), primer: primer(g.primerPaintId, g.primerCoats, g.primerSqftAdjust), materials: parseMaterials(g.materials) })),
     customAreas: (est.customAreas ?? []).map((c: any) => ({ id: c.id, label: c.label, measureType: c.measureType, amount: c.amount, rate: c.rate, coats: c.coats ?? 2, paintId: c.paintId, primer: primer(c.primerPaintId, c.primerCoats, c.primerSqftAdjust), materials: parseMaterials(c.materials) })),
+    specialProjects: (est.specialProjects ?? []).map((sp: any) => ({ id: sp.id, name: sp.name, description: sp.description, price: sp.price, materials: parseMaterials(sp.materials) })),
     lineItems: (est.lineItems ?? []).map((li: any) => ({ description: li.description, category: li.category, quantity: li.quantity, unitCost: li.unitCost, markup: li.markup, taxable: li.taxable })),
     overheadItems: (est.overheadItems ?? []).map((o: any) => ({ description: o.description, cost: o.cost, markup: o.markup })),
   };

@@ -157,6 +157,15 @@ export async function generateInvoicePdf(
     doc.fillColor("#475569").font("Helvetica").fontSize(9.5).text(" " + invoice.notes);
   }
 
+  // ---- Pay online ----
+  if (invoice.paymentLink.trim() && remaining > 0) {
+    const link = invoice.paymentLink.trim();
+    doc.moveDown(0.8);
+    ensure(18);
+    doc.fillColor(ACCENT).font("Helvetica-Bold").fontSize(10.5).text("Pay online: ", left, doc.y, { continued: true });
+    doc.fillColor("#1d4ed8").font("Helvetica").fontSize(10).text(link, { link, underline: true });
+  }
+
   doc.moveDown(1.2);
   doc.fillColor(MUTED).font("Helvetica-Oblique").fontSize(9).text("Thank you for your business!", left, doc.y, { width: contentWidth, align: "center" });
 

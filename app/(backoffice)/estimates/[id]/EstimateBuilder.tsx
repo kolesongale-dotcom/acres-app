@@ -10,17 +10,17 @@ import { useToast } from "@/components/Toast";
 import { saveEstimate } from "@/lib/actions/estimates";
 import { generateProposal } from "@/lib/actions/proposals";
 import { ESTIMATE_STATUSES, SIDING_MATERIALS, LINE_CATEGORIES, MaterialCatalogEntry, PaintDefaults, ItemMaterialPayload } from "@/lib/types";
-import { calcEstimateTotals, calcTiers, formatCurrency, formatNumber, JobRates, PaintCatalog, ServiceRow } from "@/lib/calculations";
+import { calcEstimateTotals, calcTiers, formatCurrency, formatNumber, JobRates, PaintCatalog, ServiceRow, perimeterFeet, solvePerimeter } from "@/lib/calculations";
 import {
   BuilderState, buildCalcInput, blankRoom, blankCabinet, blankDeck, blankExteriorHouse,
-  blankDoor, blankShutter, blankGarage, blankCustomArea, blankLineItem, blankOverhead, blankMaterial,
+  blankDoor, blankShutter, blankGarage, blankCustomArea, blankSpecialProject, blankLineItem, blankOverhead, blankMaterial,
 } from "@/lib/builderState";
 import { Labeled, NumberField, TextField, Toggle, CardHeader, PaintSelect, PaintOption, SheenSelect } from "./builderUI";
 
 interface CustomerOption { id: number; label: string }
 interface TierConfig { midDepositPercent: number; midDepositDiscount: number; maxDepositPercent: number; maxDepositDiscount: number }
 
-const TABS = ["Setup", "Rooms", "Cabinets", "Decks & Exteriors", "Photos", "Summary"];
+const TABS = ["Setup", "Rooms", "Cabinets", "Decks & Exteriors", "Special Projects", "Photos", "Summary"];
 
 function warrantyEndLabel(completedAt: string, months: number): string {
   const d = new Date(completedAt + "T00:00:00");
@@ -89,6 +89,8 @@ export default function EstimateBuilder({
   const [shutters, setShutters] = useState(initial.exteriorShutters);
   const [garages, setGarages] = useState(initial.garageDoors);
   const [customAreas, setCustomAreas] = useState(initial.customAreas);
+  const [specialProjects, setSpecialProjects] = useState(initial.specialProjects);
+  const [spUploadingIdx, setSpUploadingIdx] = useState<number | null>(null);
   const [lineItems, setLineItems] = useState(initial.lineItems);
   const [overhead, setOverhead] = useState(initial.overheadItems);
   const [photos, setPhotos] = useState(initial.photos);
@@ -105,6 +107,7 @@ export default function EstimateBuilder({
   const shutterOps = listOps(wrap(setShutters));
   const garageOps = listOps(wrap(setGarages));
   const caOps = listOps(wrap(setCustomAreas));
+  const spOps = listOps(wrap(setSpecialProjects));
   const liOps = listOps(wrap(setLineItems));
   const ohOps = listOps(wrap(setOverhead));
   const photoOps = listOps(wrap(setPhotos));
@@ -120,7 +123,7 @@ export default function EstimateBuilder({
   const state: BuilderState = {
     setup, rates, rooms, cabinetSets: cabinets, deckAreas: decks, exteriorHouses: houses,
     exteriorDoors: doors, exteriorShutters: shutters, garageDoors: garages,
-    customAreas, lineItems, overheadItems: overhead, photos,
+    customAreas, specialProjects, lineItems, overheadItems: overhead, photos,
   };
 
   const { services, totals } = useMemo(() => calcEstimateTotals(buildCalcInput(state, paintCatalog, defaults)), [state, paintCatalog, defaults]);
@@ -148,6 +151,31 @@ export default function EstimateBuilder({
       }
       success("Photos added — remember to Save.");
     } finally { setUploading(false); }
+  }
+
+  async function uploadSpecialFiles(idx: number, files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setSpUploadingIdx(idx);
+    const added: { url: string; caption: string; fileType: string }[] = [];
+    try {
+      for (const file of Array.from(files)) {
+        try {
+          const isImage = file.type.startsWith("image/");
+          const fd = new FormData();
+          fd.append("folder", "special");
+          if (isImage) { const blob = await downscaleImage(file); fd.append("file", blob, "photo.jpg"); }
+          else { fd.append("file", file, file.name); }
+          const res = await fetch("/api/upload", { method: "POST", body: fd });
+          const data = await res.json();
+          if (res.ok && data.url) added.push({ url: data.url, caption: isImage ? "" : file.name, fileType: data.fileType ?? (isImage ? "image" : "file") });
+          else error(data.error || "Upload failed.");
+        } catch { error(`Could not upload ${file.name}.`); }
+      }
+      if (added.length) {
+        spOps.update(idx, { files: [...(specialProjects[idx]?.files ?? []), ...added] });
+        success("Attachment(s) added — remember to Save.");
+      }
+    } finally { setSpUploadingIdx(null); }
   }
 
   function doSave(): Promise<boolean> {
@@ -277,11 +305,20 @@ export default function EstimateBuilder({
                 {rooms.map((room, i) => (
                   <div key={i} className="card">
                     <CardHeader name={room.name} onName={(v) => roomOps.update(i, { name: v })} onMoveUp={i > 0 ? () => roomOps.move(i, "up") : undefined} onMoveDown={i < rooms.length - 1 ? () => roomOps.move(i, "down") : undefined} onDelete={() => roomOps.remove(i)} />
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-                      <Labeled label="Length"><NumberField value={room.length} onChange={(v) => roomOps.update(i, { length: v })} suffix="ft" /></Labeled>
-                      <Labeled label="Width"><NumberField value={room.width} onChange={(v) => roomOps.update(i, { width: v })} suffix="ft" /></Labeled>
-                      <Labeled label="Height"><NumberField value={room.height} onChange={(v) => roomOps.update(i, { height: v })} suffix="ft" /></Labeled>
-                    </div>
+                    <ModeToggle
+                      mode={room.measureMode}
+                      onSimple={() => roomOps.update(i, { measureMode: "simple" })}
+                      onPerimeter={() => roomOps.update(i, { measureMode: "perimeter", walls: (room.walls?.length ?? 0) >= 3 ? room.walls : seedWallsFromRect(room.length, room.width) })}
+                    />
+                    {room.measureMode === "perimeter" ? (
+                      <PerimeterWalls walls={room.walls ?? []} height={room.height} onWalls={(w) => roomOps.update(i, { walls: w })} onHeight={(v) => roomOps.update(i, { height: v })} />
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                        <Labeled label="Length"><NumberField value={room.length} onChange={(v) => roomOps.update(i, { length: v })} suffix="ft" /></Labeled>
+                        <Labeled label="Width"><NumberField value={room.width} onChange={(v) => roomOps.update(i, { width: v })} suffix="ft" /></Labeled>
+                        <Labeled label="Height"><NumberField value={room.height} onChange={(v) => roomOps.update(i, { height: v })} suffix="ft" /></Labeled>
+                      </div>
+                    )}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginTop: 12 }}>
                       <Labeled label="Manual Wall SqFt (+/-)"><NumberField value={room.wallSqftAdjust} onChange={(v) => roomOps.update(i, { wallSqftAdjust: v })} /></Labeled>
                       <Labeled label="Manual Ceiling SqFt (+/-)"><NumberField value={room.ceilingSqftAdjust} onChange={(v) => roomOps.update(i, { ceilingSqftAdjust: v })} /></Labeled>
@@ -458,8 +495,60 @@ export default function EstimateBuilder({
           </div>
         )}
 
-        {/* PHOTOS */}
+        {/* SPECIAL PROJECTS */}
         {tab === 4 && (
+          <div>
+            <SectionToolbar label={`${specialProjects.length} special project${specialProjects.length === 1 ? "" : "s"}`} onAdd={() => spOps.add({ ...blankSpecialProject(), name: `Special Project ${specialProjects.length + 1}` })} addLabel="+ Add Special Project" />
+            <p style={{ fontSize: 12.5, color: "var(--text-dim)", margin: "0 0 16px" }}>One-off work priced as a flat amount — no rates or markup. The price drops straight into the estimate total and the proposal.</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {specialProjects.map((sp, i) => (
+                <div key={i} className="card">
+                  <CardHeader name={sp.name} onName={(v) => spOps.update(i, { name: v })} onMoveUp={i > 0 ? () => spOps.move(i, "up") : undefined} onMoveDown={i < specialProjects.length - 1 ? () => spOps.move(i, "down") : undefined} onDelete={() => spOps.remove(i)} />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 200px", gap: 12 }}>
+                    <Labeled label="Description (shown on proposal)"><textarea className="textarea" style={{ minHeight: 70 }} value={sp.description} onChange={(e) => spOps.update(i, { description: e.target.value })} placeholder="What this project covers…" /></Labeled>
+                    <Labeled label="Price (flat)"><NumberField value={sp.price} onChange={(v) => spOps.update(i, { price: v })} suffix="$" /></Labeled>
+                  </div>
+                  <div style={{ marginTop: 12 }}>
+                    <Labeled label="Internal Notes (not shown to client)"><textarea className="textarea" style={{ minHeight: 50 }} value={sp.notes} onChange={(e) => spOps.update(i, { notes: e.target.value })} placeholder="Private notes…" /></Labeled>
+                  </div>
+                  <MaterialsEditor materials={sp.materials} onChange={(m) => spOps.update(i, { materials: m })} options={materialItems} />
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-light)" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8, flexWrap: "wrap" }}>
+                      <span className="section-title">Attachments ({sp.files.length})</span>
+                      <label className="btn btn-ghost btn-sm" style={{ cursor: spUploadingIdx === i ? "wait" : "pointer" }}>
+                        {spUploadingIdx === i ? <LoadingSpinner size={14} /> : "+ Add Photos / Files"}
+                        <input type="file" multiple style={{ display: "none" }} disabled={spUploadingIdx === i} onChange={(e) => { uploadSpecialFiles(i, e.target.files); e.target.value = ""; }} />
+                      </label>
+                    </div>
+                    {sp.files.length === 0 ? (
+                      <span style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No attachments yet.</span>
+                    ) : (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+                        {sp.files.map((f, fi) => (
+                          <div key={fi} className="card card-tight" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                            {f.fileType === "image" ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={f.url} alt={f.caption || "attachment"} style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 8, background: "var(--bg-secondary)" }} />
+                            ) : (
+                              <a href={f.url} target="_blank" rel="noreferrer" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, height: 120, borderRadius: 8, background: "var(--bg-secondary)", color: "var(--accent)", textDecoration: "none", fontSize: 13, padding: 10, textAlign: "center", overflow: "hidden", wordBreak: "break-word" }}>📄 {f.caption || "Open file"}</a>
+                            )}
+                            <input className="input" style={{ fontSize: 12.5 }} placeholder="Caption…" value={f.caption} onChange={(e) => spOps.update(i, { files: sp.files.map((x, xi) => (xi === fi ? { ...x, caption: e.target.value } : x)) })} />
+                            <button className="btn btn-icon btn-danger btn-sm" style={{ alignSelf: "flex-end" }} onClick={() => spOps.update(i, { files: sp.files.filter((_, xi) => xi !== fi) })}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <ItemFooter total={itemTotal(`special:${sp.id ?? sp.name}`)} />
+                </div>
+              ))}
+              {specialProjects.length === 0 && <EmptyHint text="No special projects." />}
+            </div>
+          </div>
+        )}
+
+        {/* PHOTOS */}
+        {tab === 5 && (
           <div>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 10 }}>
               <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Project Photos ({photos.length})</h2>
@@ -489,7 +578,7 @@ export default function EstimateBuilder({
         )}
 
         {/* SUMMARY (grouped services, name + total) */}
-        {tab === 5 && (
+        {tab === 6 && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24, alignItems: "start" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
@@ -712,6 +801,79 @@ function UnitSection({ title, items, ops, addLabel, blank, paintItems, materialI
         ))}
         {items.length === 0 && <EmptyHint text={`No ${title.toLowerCase()} added.`} />}
       </div>
+    </div>
+  );
+}
+
+// --- Perimeter Walk ---
+type WallSeg = { feet: number; inches: number };
+
+function ftToSeg(v: number): WallSeg {
+  const val = Number.isFinite(v) ? Math.max(0, v) : 0;
+  let feet = Math.floor(val);
+  let inches = Math.round((val - feet) * 12);
+  if (inches >= 12) { feet += 1; inches = 0; }
+  return { feet, inches };
+}
+/** Seed a rectangle (L, W, L, W) when first switching a room into perimeter mode. */
+function seedWallsFromRect(length: number, width: number): WallSeg[] {
+  return [ftToSeg(length), ftToSeg(width), ftToSeg(length), ftToSeg(width)];
+}
+
+function ModeToggle({ mode, onSimple, onPerimeter }: { mode: string; onSimple: () => void; onPerimeter: () => void }) {
+  const isPerim = mode === "perimeter";
+  const btn = (active: boolean) => ({
+    padding: "6px 14px", fontSize: 13, fontWeight: 600, cursor: "pointer", borderRadius: 7,
+    border: "none", background: active ? "var(--accent)" : "transparent", color: active ? "#fff" : "var(--text-dim)",
+  } as const);
+  return (
+    <div style={{ display: "inline-flex", gap: 4, marginBottom: 12, background: "rgba(255,255,255,0.04)", padding: 3, borderRadius: 9 }}>
+      <button type="button" onClick={onSimple} style={btn(!isPerim)}>Simple</button>
+      <button type="button" onClick={onPerimeter} style={btn(isPerim)}>Perimeter Walk</button>
+    </div>
+  );
+}
+
+function PerimeterWalls({ walls, height, onWalls, onHeight }: {
+  walls: WallSeg[]; height: number; onWalls: (w: WallSeg[]) => void; onHeight: (v: number) => void;
+}) {
+  const perim = perimeterFeet(walls);
+  const { closes, area } = solvePerimeter(walls);
+  const setWall = (idx: number, patch: Partial<WallSeg>) => onWalls(walls.map((w, wi) => (wi === idx ? { ...w, ...patch } : w)));
+  const addWall = () => onWalls([...walls, { feet: 0, inches: 0 }]);
+  const removeWall = (idx: number) => { if (walls.length <= 3) return; onWalls(walls.filter((_, wi) => wi !== idx)); };
+  const atMin = walls.length <= 3;
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 14 }}>
+        <Labeled label="Ceiling Height"><NumberField value={height} onChange={onHeight} suffix="ft" /></Labeled>
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+        <span className="section-title">Perimeter Walls</span>
+        <span style={{ fontSize: 11.5, color: "var(--text-dim)" }}>Walk the room and enter each wall in order</span>
+        <button className="btn btn-ghost btn-sm" onClick={addWall} style={{ marginLeft: "auto" }}>+ Add Wall</button>
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {walls.map((w, wi) => (
+          <div key={wi} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span style={{ width: 56, fontSize: 13, color: "var(--text-muted)", fontWeight: 600, flexShrink: 0 }}>Wall {wi + 1}</span>
+            <div style={{ flex: 1 }}><MiniNum value={w.feet} onChange={(v) => setWall(wi, { feet: Math.max(0, Math.round(v)) })} suffix="ft" /></div>
+            <div style={{ flex: 1 }}><MiniNum value={w.inches} onChange={(v) => setWall(wi, { inches: Math.max(0, v) })} suffix="in" /></div>
+            <button className="btn btn-icon btn-danger btn-sm" onClick={() => removeWall(wi)} disabled={atMin} title={atMin ? "Minimum 3 walls" : "Delete wall"}>✕</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ marginTop: 12, padding: "10px 12px", borderRadius: 8, background: "rgba(16,185,129,0.08)", border: "1px solid var(--border-light)", display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13 }}>
+        <span style={{ color: "var(--text-dim)" }}>Perimeter <strong style={{ color: "var(--text-primary)" }}>{formatNumber(perim, 1)} lf</strong></span>
+        <span style={{ color: "var(--text-dim)" }}>Ceiling area <strong style={{ color: "var(--accent)" }}>{closes ? `${formatNumber(area, 1)} sq ft` : "—"}</strong></span>
+        <span style={{ color: "var(--text-dim)" }}>Walls <strong style={{ color: "var(--text-primary)" }}>{formatNumber(perim * (Number.isFinite(height) ? height : 0), 0)} sq ft</strong></span>
+      </div>
+      {!closes && (
+        <div style={{ marginTop: 8, padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.35)", fontSize: 12.5, color: "var(--warning, #f59e0b)", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 15 }}>⚠</span>
+          <span>These walls don&apos;t close — check your measurements.</span>
+        </div>
+      )}
     </div>
   );
 }

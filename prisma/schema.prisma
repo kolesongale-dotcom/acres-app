@@ -109,6 +109,7 @@ model Estimate {
   garageDoors      ExteriorGarageDoor[]
   overheadItems    OverheadItem[]
   customAreas      CustomArea[]
+  specialProjects  SpecialProject[]
   photos           EstimatePhoto[]
   followUps        FollowUpReminder[]
   proposal         Proposal?
@@ -147,6 +148,8 @@ model Room {
   length         Float           @default(0)
   width          Float           @default(0)
   height         Float           @default(0)
+  measureMode    String          @default("simple") // "simple" (L×W) | "perimeter" (wallsJson)
+  wallsJson      String          @default("[]")      // perimeter-walk segments [{feet,inches}]
   paintWalls     Boolean         @default(true)
   paintCeiling   Boolean         @default(false)
   paintTrim      Boolean         @default(false)
@@ -409,6 +412,32 @@ model CustomArea {
   estimate     Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
 }
 
+// Special / one-off project line on an estimate: a flat manual price (NO rates,
+// NO markup) plus its own Price-Book materials and photo/file attachments. Its
+// price flows straight into the estimate total as a flat line item.
+model SpecialProject {
+  id          Int                  @id @default(autoincrement())
+  estimateId  Int
+  name        String               @default("Special Project")
+  description String               @default("")
+  price       Float                @default(0)
+  notes       String               @default("")
+  materials   String               @default("[]") // [{priceBookItemId,name,unit,quantity,unitCost,markup}]
+  sortOrder   Int                  @default(0)
+  estimate    Estimate             @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  files       SpecialProjectFile[]
+}
+
+model SpecialProjectFile {
+  id               Int            @id @default(autoincrement())
+  specialProjectId Int
+  url              String
+  caption          String         @default("")
+  fileType         String         @default("image") // "image" | "file"
+  createdAt        DateTime       @default(now())
+  specialProject   SpecialProject @relation(fields: [specialProjectId], references: [id], onDelete: Cascade)
+}
+
 // Reusable pricing for Paint and Materials/Supplies. Each item stores the
 // owner's actual cost plus a per-item markup percentage (markup varies by item).
 // For paint, `coverage` is sq ft per gallon (default 400) and unit is "gallon".
@@ -548,6 +577,7 @@ model Invoice {
   subtotal      Float     @default(0)
   total         Float     @default(0)
   lineItemsJson String    @default("[]") // [{name,total}] snapshot for display
+  paymentLink   String    @default("")   // optional online-pay URL (QuickBooks/Stripe/etc.)
   dueDate       DateTime
   notes         String    @default("")
   createdAt     DateTime  @default(now())

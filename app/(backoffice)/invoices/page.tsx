@@ -75,7 +75,7 @@ export default async function InvoicesPage() {
                   <th>Invoice</th>
                   <th>Client / Project</th>
                   <th style={{ textAlign: "right" }}>Total</th>
-                  <th style={{ textAlign: "right" }}>Remaining</th>
+                  <th style={{ textAlign: "right" }}>Balance Due</th>
                   <th>Due</th>
                   <th>Status</th>
                 </tr>
@@ -91,7 +91,7 @@ export default async function InvoicesPage() {
                       </Link>
                     </td>
                     <td style={{ textAlign: "right" }}>{formatCurrency(r.total)}</td>
-                    <td style={{ textAlign: "right", fontWeight: 600, color: r.remaining > 0 ? "var(--text-primary)" : "var(--accent)" }}>{formatCurrency(r.remaining)}</td>
+                    <td style={{ textAlign: "right", fontWeight: 600, color: r.status === "Overdue" ? "#f87171" : r.remaining > 0 ? "var(--text-primary)" : "var(--accent)" }}>{formatCurrency(r.remaining)}</td>
                     <td style={{ color: "var(--text-dim)" }}>{formatDate(r.dueDate)}</td>
                     <td><StatusPill status={r.status} /></td>
                   </tr>

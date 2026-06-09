@@ -23,6 +23,17 @@ function parseMats(json: string | null | undefined): ItemMaterialPayload[] {
   }
 }
 
+function parseWalls(json: string | null | undefined): { feet: number; inches: number }[] {
+  if (!json) return [];
+  try {
+    const arr = JSON.parse(json);
+    if (!Array.isArray(arr)) return [];
+    return arr.map((w: any) => ({ feet: Number(w.feet) || 0, inches: Number(w.inches) || 0 }));
+  } catch {
+    return [];
+  }
+}
+
 export default async function EstimateBuilderPage({
   params,
 }: {
@@ -83,6 +94,8 @@ export default async function EstimateBuilderPage({
       length: r.length,
       width: r.width,
       height: r.height,
+      measureMode: r.measureMode ?? "simple",
+      walls: parseWalls(r.wallsJson),
       paintWalls: r.paintWalls,
       paintCeiling: r.paintCeiling,
       paintTrim: r.paintTrim,
@@ -116,6 +129,7 @@ export default async function EstimateBuilderPage({
     exteriorShutters: estimate.exteriorShutters.map((s) => ({ id: s.id, name: s.name, story1: s.story1, story2: s.story2, story3: s.story3, customQty: s.customQty, customRate: s.customRate, coats: s.coats, paintProduct: s.paintProduct, sheen: s.sheen, paintId: s.paintId, primerPaintId: s.primerPaintId, primerCoats: s.primerCoats, primerSqftAdjust: s.primerSqftAdjust, materials: parseMats(s.materials), sortOrder: s.sortOrder })),
     garageDoors: estimate.garageDoors.map((g) => ({ id: g.id, name: g.name, count: g.count, width: g.width, height: g.height, coats: g.coats, paintProduct: g.paintProduct, sheen: g.sheen, paintId: g.paintId, primerPaintId: g.primerPaintId, primerCoats: g.primerCoats, primerSqftAdjust: g.primerSqftAdjust, materials: parseMats(g.materials), sortOrder: g.sortOrder })),
     customAreas: estimate.customAreas.map((c) => ({ id: c.id, label: c.label, measureType: c.measureType, amount: c.amount, rate: c.rate, coats: c.coats, paintProduct: c.paintProduct, sheen: c.sheen, paintId: c.paintId, primerPaintId: c.primerPaintId, primerCoats: c.primerCoats, primerSqftAdjust: c.primerSqftAdjust, materials: parseMats(c.materials), sortOrder: c.sortOrder })),
+    specialProjects: estimate.specialProjects.map((sp) => ({ id: sp.id, name: sp.name, description: sp.description, price: sp.price, notes: sp.notes, materials: parseMats(sp.materials), files: sp.files.map((f) => ({ id: f.id, url: f.url, caption: f.caption, fileType: f.fileType })), sortOrder: sp.sortOrder })),
     lineItems: estimate.lineItems.map((li) => ({ id: li.id, description: li.description, category: li.category, quantity: li.quantity, unitCost: li.unitCost, markup: li.markup, taxable: li.taxable, unit: li.unit, priceBookItemId: li.priceBookItemId, sortOrder: li.sortOrder })),
     overheadItems: estimate.overheadItems.map((o) => ({ id: o.id, description: o.description, cost: o.cost, markup: o.markup, sortOrder: o.sortOrder })),
     photos: estimate.photos.map((p) => ({ id: p.id, url: p.url, caption: p.caption, sortOrder: p.sortOrder })),

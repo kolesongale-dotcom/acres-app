@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -297,10 +297,19 @@ function ExportTab() {
     { type: "customers", label: "Customer List", desc: "All contacts with status, lead source, and estimate counts." },
     { type: "estimates", label: "Estimate List", desc: "All estimates with project, customer, status, and grand total." },
     { type: "proposals", label: "Proposal List", desc: "All proposals with status, selected tier, totals, and signatures." },
-    { type: "all", label: "Everything (one workbook)", desc: "Customers, estimates, and proposals as separate sheets." },
+    { type: "invoices", label: "Invoice List", desc: "Invoice #, customer, project, total, amount paid, balance due, due date, status." },
+    { type: "payments", label: "Payment History", desc: "Every recorded payment: invoice #, customer, amount, date, and note." },
+    { type: "changeorders", label: "Change Order List", desc: "Change order #, estimate/project, description, total, status, signed date." },
+    { type: "colorsheets", label: "Color Sheets", desc: "Client color picks: estimate #, customer, project, surface, color name/code, provider." },
+    { type: "pricebook", label: "Price Book", desc: "All paint & material items: type, name, brand, unit, cost, markup, coverage, category." },
+    { type: "budget", label: "Budget Summary", desc: "Estimated vs. actual revenue, labor, paint, and materials per job." },
+    { type: "followups", label: "Follow-Up Reminders", desc: "Customer, due date, note, and completed status." },
+    { type: "all", label: "Everything (one workbook)", desc: "Every record type above as separate sheets in one file." },
   ];
   return (
-    <div className="card animate-fade-in" style={{ maxWidth: 640 }}>
+    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 24, maxWidth: 640 }}>
+    <DataBackupSection />
+    <div className="card">
       <h2 className="section-title" style={{ marginBottom: 6 }}>Export Data to Excel</h2>
       <p style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 0, marginBottom: 18 }}>
         Download your records as .xlsx spreadsheets for backup or accounting.
@@ -316,6 +325,139 @@ function ExportTab() {
           </div>
         ))}
       </div>
+    </div>
+    </div>
+  );
+}
+
+const BACKUP_TABLE_LABELS: Record<string, string> = {
+  companyProfile: "Company Profile", businessSettings: "Business Settings", jobRateSettings: "Job Rates",
+  zohoConfig: "Zoho Config", procedureTemplates: "Procedures (SOPs)", priceBookItems: "Price Book",
+  customers: "Customers", estimates: "Estimates", rooms: "Rooms", roomDeductions: "Room Openings",
+  accentWalls: "Accent Walls", cabinetSets: "Cabinet Sets", deckAreas: "Decks", exteriorHouses: "Exterior Houses",
+  exteriorDeductions: "Exterior Openings", exteriorReplacements: "Exterior Replacements", exteriorDoors: "Exterior Doors",
+  exteriorShutters: "Shutters", garageDoors: "Garage Doors", overheadItems: "Overhead Items", customAreas: "Custom Areas",
+  specialProjects: "Special Projects", specialProjectFiles: "Special Project Files",
+  estimateLineItems: "Line Items", estimatePhotos: "Photos", followUpReminders: "Follow-ups", proposals: "Proposals",
+  budgetEntries: "Budget Entries", invoices: "Invoices", payments: "Payments", changeOrders: "Change Orders",
+  colorSelections: "Color Selections",
+};
+
+interface ImportSummary { counts: Record<string, number>; total: number; schemaVersion: string | null; schemaMatch: boolean }
+
+function DataBackupSection() {
+  const { success, error } = useToast();
+  const router = useRouter();
+  const [lastBackup, setLastBackup] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
+
+  useEffect(() => {
+    try { setLastBackup(localStorage.getItem("acres:lastBackup")); } catch {}
+  }, []);
+
+  function markExported() {
+    const iso = new Date().toISOString();
+    try { localStorage.setItem("acres:lastBackup", iso); } catch {}
+    setLastBackup(iso);
+  }
+
+  function pickFile(file: File | null | undefined) {
+    if (!file) return;
+    setSummary(null);
+    setPendingFile(file);
+    setConfirmOpen(true);
+  }
+
+  async function runImport() {
+    if (!pendingFile) return;
+    setConfirmOpen(false);
+    setImporting(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", pendingFile, pendingFile.name);
+      const res = await fetch("/api/admin/import", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSummary(data as ImportSummary);
+        success(`Restored ${data.total} records from backup.`);
+        router.refresh();
+      } else {
+        error(data.error || "Import failed.");
+      }
+    } catch {
+      error("Import failed — could not reach the server.");
+    } finally {
+      setImporting(false);
+      setPendingFile(null);
+    }
+  }
+
+  const restoredRows = summary
+    ? Object.entries(summary.counts).filter(([, n]) => n > 0)
+    : [];
+
+  return (
+    <div className="card">
+      <h2 className="section-title" style={{ marginBottom: 6 }}>Data Backup</h2>
+      <p style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 0, marginBottom: 18 }}>
+        Download a complete copy of your entire database as a single JSON file, or restore from one.
+        Keep regular backups — this is your safety net against data loss.
+      </p>
+
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+        <a className="btn btn-primary" href="/api/admin/export" download onClick={markExported}>↓ Export All Data</a>
+        <label className="btn btn-secondary" style={{ cursor: importing ? "wait" : "pointer" }}>
+          {importing ? <LoadingSpinner size={16} /> : "↑ Import from Backup…"}
+          <input
+            type="file"
+            accept="application/json,.json"
+            style={{ display: "none" }}
+            disabled={importing}
+            onChange={(e) => { pickFile(e.target.files?.[0]); e.target.value = ""; }}
+          />
+        </label>
+      </div>
+
+      <div style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 12 }}>
+        {lastBackup
+          ? `Last export on this device: ${new Date(lastBackup).toLocaleString()}`
+          : "No backup exported from this device yet."}
+      </div>
+
+      {summary && (
+        <div style={{ marginTop: 18, padding: "14px 16px", background: "var(--bg-secondary)", border: "1px solid var(--border-light)", borderRadius: 10 }}>
+          <div style={{ fontWeight: 700, color: "var(--text-primary)", marginBottom: 8 }}>
+            Restored {summary.total} records
+            {!summary.schemaMatch && summary.schemaVersion && (
+              <span style={{ fontWeight: 500, color: "var(--warning, #f59e0b)", fontSize: 12.5, marginLeft: 8 }}>
+                ⚠ backup version {summary.schemaVersion} differs from this app — verify your data.
+              </span>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: "2px 16px" }}>
+            {restoredRows.map(([key, n]) => (
+              <div key={key} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, color: "var(--text-secondary)", padding: "2px 0" }}>
+                <span>{BACKUP_TABLE_LABELS[key] ?? key}</span>
+                <span style={{ color: "var(--text-primary)", fontWeight: 600 }}>{n}</span>
+              </div>
+            ))}
+            {restoredRows.length === 0 && <span style={{ fontSize: 12.5, color: "var(--text-dim)" }}>No records in this backup.</span>}
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        danger
+        title="Restore from backup?"
+        confirmLabel="Overwrite & Restore"
+        message={`This will restore records from "${pendingFile?.name ?? "the file"}" and OVERWRITE any existing records with the same IDs. This cannot be undone. Export a fresh backup first if you're unsure. Continue?`}
+        onConfirm={runImport}
+        onCancel={() => { setConfirmOpen(false); setPendingFile(null); }}
+      />
     </div>
   );
 }

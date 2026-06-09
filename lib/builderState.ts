@@ -1,7 +1,7 @@
 import { FullEstimateInput, PaintCatalog, JobRates, DEFAULT_JOB_RATES, PrimerInput } from "@/lib/calculations";
 import {
   RoomPayload, CabinetPayload, DeckPayload, ExteriorHousePayload, DoorPayload, ShutterPayload,
-  GaragePayload, CustomAreaPayload, LineItemPayload, OverheadPayload, PhotoPayload,
+  GaragePayload, CustomAreaPayload, SpecialProjectPayload, LineItemPayload, OverheadPayload, PhotoPayload,
   EstimateSetupPayload, PaintDefaults, ItemMaterialPayload,
 } from "@/lib/types";
 
@@ -16,6 +16,7 @@ export interface BuilderState {
   exteriorShutters: ShutterPayload[];
   garageDoors: GaragePayload[];
   customAreas: CustomAreaPayload[];
+  specialProjects: SpecialProjectPayload[];
   lineItems: LineItemPayload[];
   overheadItems: OverheadPayload[];
   photos: PhotoPayload[];
@@ -24,6 +25,7 @@ export interface BuilderState {
 export function blankRoom(): RoomPayload {
   return {
     name: "Room", length: 12, width: 12, height: 8,
+    measureMode: "simple", walls: [],
     paintWalls: true, paintCeiling: false, paintTrim: false,
     wallCoats: 2, ceilingCoats: 2, trimCoats: 2,
     wallSqftAdjust: 0, ceilingSqftAdjust: 0, trimLfAdjust: 0,
@@ -57,6 +59,9 @@ export function blankGarage(): GaragePayload {
 export function blankCustomArea(): CustomAreaPayload {
   return { label: "Custom Area", measureType: "area", amount: 0, rate: 0, coats: 2, paintProduct: "", sheen: "Unsure", paintId: null, primerPaintId: null, primerCoats: 1, primerSqftAdjust: 0, materials: [], sortOrder: 0 };
 }
+export function blankSpecialProject(): SpecialProjectPayload {
+  return { name: "Special Project", description: "", price: 0, notes: "", materials: [], files: [], sortOrder: 0 };
+}
 export function blankLineItem(): LineItemPayload {
   return { description: "", category: "Material", quantity: 1, unitCost: 0, markup: 0, taxable: true, unit: "", priceBookItemId: null, sortOrder: 0 };
 }
@@ -80,6 +85,7 @@ export function buildCalcInput(s: BuilderState, paintCatalog: PaintCatalog, defa
     paintCatalog,
     rooms: s.rooms.map((r) => ({
       id: r.id, name: r.name, length: r.length, width: r.width, height: r.height,
+      measureMode: r.measureMode ?? "simple", walls: r.walls ?? [],
       paintWalls: r.paintWalls, paintCeiling: r.paintCeiling, paintTrim: r.paintTrim,
       wallCoats: r.wallCoats, ceilingCoats: r.ceilingCoats, trimCoats: r.trimCoats,
       wallSqftAdjust: r.wallSqftAdjust, ceilingSqftAdjust: r.ceilingSqftAdjust, trimLfAdjust: r.trimLfAdjust,
@@ -100,6 +106,7 @@ export function buildCalcInput(s: BuilderState, paintCatalog: PaintCatalog, defa
     exteriorShutters: s.exteriorShutters.map((sh) => ({ id: sh.id, name: sh.name, story1: sh.story1, story2: sh.story2, story3: sh.story3, customQty: sh.customQty, customRate: sh.customRate, coats: sh.coats, paintId: eff(sh.paintId, defaults.defaultShutterPaintId), primer: primer(sh.primerPaintId, sh.primerCoats, sh.primerSqftAdjust), materials: mats(sh.materials) })),
     garageDoors: s.garageDoors.map((g) => ({ id: g.id, name: g.name, count: g.count, width: g.width, height: g.height, coats: g.coats, paintId: eff(g.paintId, defaults.defaultGaragePaintId), primer: primer(g.primerPaintId, g.primerCoats, g.primerSqftAdjust), materials: mats(g.materials) })),
     customAreas: s.customAreas.map((c) => ({ id: c.id, label: c.label, measureType: c.measureType, amount: c.amount, rate: c.rate, coats: c.coats, paintId: c.paintId, primer: primer(c.primerPaintId, c.primerCoats, c.primerSqftAdjust), materials: mats(c.materials) })),
+    specialProjects: s.specialProjects.map((sp) => ({ id: sp.id, name: sp.name, description: sp.description, price: sp.price, materials: mats(sp.materials) })),
     lineItems: s.lineItems.map((li) => ({ description: li.description, category: li.category, quantity: li.quantity, unitCost: li.unitCost, markup: li.markup, taxable: li.taxable })),
     overheadItems: s.overheadItems.map((o) => ({ description: o.description, cost: o.cost, markup: o.markup })),
   };
