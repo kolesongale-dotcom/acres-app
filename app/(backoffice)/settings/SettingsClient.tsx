@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import Modal from "@/components/Modal";
 import { useToast } from "@/components/Toast";
 import {
   updateCompanyProfile,
@@ -16,6 +17,13 @@ import {
 } from "@/lib/actions/settings";
 import { connectZoho, updateZohoConfig, disconnectZoho, testZoho } from "@/lib/actions/zoho";
 import { updateJobRates } from "@/lib/actions/settings";
+import {
+  createWorker,
+  updateWorker,
+  resetWorkerPassword,
+  deleteWorker,
+  setWorkerAssignments,
+} from "@/lib/actions/workers";
 import { JobRates } from "@/lib/calculations";
 import { PaintDefaults } from "@/lib/types";
 
@@ -55,8 +63,14 @@ export interface Business {
 export interface Procedure {
   id: number; category: string; title: string; description: string; isDefault: boolean; sortOrder: number;
 }
+export interface WorkerRow {
+  id: number; name: string; username: string; active: boolean; assignedEstimateIds: number[];
+}
+export interface JobOption {
+  id: number; label: string; status: string;
+}
 
-const TABS = ["Company Profile", "Business Settings", "Job Rates", "Proposal Email", "Procedures", "Zoho Mail", "Data Export"];
+const TABS = ["Company Profile", "Business Settings", "Job Rates", "Proposal Email", "Procedures", "Zoho Mail", "Workers", "Data Export"];
 
 export default function SettingsClient({
   company,
@@ -65,6 +79,8 @@ export default function SettingsClient({
   zoho,
   jobRates,
   paintOptions,
+  workers,
+  jobOptions,
 }: {
   company: Company;
   business: Business;
@@ -72,12 +88,14 @@ export default function SettingsClient({
   zoho: ZohoData;
   jobRates: JobRatesData;
   paintOptions: PaintOpt[];
+  workers: WorkerRow[];
+  jobOptions: JobOption[];
 }) {
   const [tab, setTab] = useState(0);
 
   return (
     <div>
-      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border)", marginBottom: 24, flexWrap: "wrap" }}>
         {TABS.map((t, i) => (
           <button key={t} className={`tab-btn ${tab === i ? "active" : ""}`} onClick={() => setTab(i)}>
             {t}
@@ -90,7 +108,8 @@ export default function SettingsClient({
       {tab === 3 && <EmailTab template={business.proposalEmailTemplate} />}
       {tab === 4 && <ProceduresTab procedures={procedures} />}
       {tab === 5 && <ZohoTab zoho={zoho} />}
-      {tab === 6 && <ExportTab />}
+      {tab === 6 && <WorkersTab workers={workers} jobOptions={jobOptions} />}
+      {tab === 7 && <ExportTab />}
     </div>
   );
 }
@@ -292,6 +311,184 @@ function ZohoTab({ zoho }: { zoho: ZohoData }) {
   );
 }
 
+function WorkersTab({ workers, jobOptions }: { workers: WorkerRow[]; jobOptions: JobOption[] }) {
+  const { success, error } = useToast();
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [newWorker, setNewWorker] = useState({ name: "", username: "", password: "" });
+  const [expanded, setExpanded] = useState<number | null>(null);
+  const [assignSelection, setAssignSelection] = useState<number[]>([]);
+  const [resetTarget, setResetTarget] = useState<number | null>(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<WorkerRow | null>(null);
+
+  function addWorker() {
+    if (!newWorker.name.trim() || !newWorker.username.trim() || newWorker.password.length < 6) {
+      error("Name, username, and a password of at least 6 characters are required.");
+      return;
+    }
+    start(async () => {
+      const res = await createWorker(newWorker);
+      if (res.success) {
+        success("Worker added.");
+        setNewWorker({ name: "", username: "", password: "" });
+        router.refresh();
+      } else error(res.error);
+    });
+  }
+
+  function toggleActive(w: WorkerRow) {
+    start(async () => {
+      const res = await updateWorker(w.id, { active: !w.active });
+      if (res.success) { success(w.active ? "Worker deactivated." : "Worker reactivated."); router.refresh(); }
+      else error(res.error);
+    });
+  }
+
+  function openAssign(w: WorkerRow) {
+    setExpanded(expanded === w.id ? null : w.id);
+    setAssignSelection(w.assignedEstimateIds);
+  }
+
+  function saveAssignments(workerId: number) {
+    start(async () => {
+      const res = await setWorkerAssignments(workerId, assignSelection);
+      if (res.success) { success("Job assignments saved."); setExpanded(null); router.refresh(); }
+      else error(res.error);
+    });
+  }
+
+  function doReset() {
+    if (resetTarget === null) return;
+    if (resetPassword.length < 6) { error("Password must be at least 6 characters."); return; }
+    const id = resetTarget;
+    start(async () => {
+      const res = await resetWorkerPassword(id, resetPassword);
+      if (res.success) { success("Password reset."); setResetTarget(null); setResetPassword(""); }
+      else error(res.error);
+    });
+  }
+
+  function doDelete() {
+    if (!deleteTarget) return;
+    const id = deleteTarget.id;
+    start(async () => {
+      const res = await deleteWorker(id);
+      if (res.success) { success("Worker removed."); setDeleteTarget(null); router.refresh(); }
+      else error(res.error);
+    });
+  }
+
+  return (
+    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 780 }}>
+      <div className="card">
+        <h2 className="section-title" style={{ marginBottom: 6 }}>Crew Access</h2>
+        <p style={{ fontSize: 13, color: "var(--text-dim)", marginTop: 0, marginBottom: 18 }}>
+          Give workers their own login at <code>/worker/login</code>. They can only see jobs you assign to them, update
+          job-site notes, mark jobs complete, and add photos — no pricing, estimates, or customer financials.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {workers.map((w) => (
+            <div key={w.id} style={{ border: "1px solid var(--border-light)", borderRadius: 10, padding: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontWeight: 700, color: "var(--text-primary)" }}>{w.name}</div>
+                  <div style={{ fontSize: 12.5, color: "var(--text-dim)" }}>@{w.username} · {w.assignedEstimateIds.length} job(s) assigned</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <span className="badge" style={w.active ? { background: "#166534", color: "#22c55e" } : { background: "#374151", color: "#d1d5db" }}>
+                    {w.active ? "Active" : "Deactivated"}
+                  </span>
+                  <button className="btn btn-secondary" disabled={pending} onClick={() => openAssign(w)}>Assign Jobs</button>
+                  <button className="btn btn-secondary" disabled={pending} onClick={() => { setResetTarget(w.id); setResetPassword(""); }}>Reset Password</button>
+                  <button className="btn btn-secondary" disabled={pending} onClick={() => toggleActive(w)}>{w.active ? "Deactivate" : "Reactivate"}</button>
+                  <button className="btn btn-danger" disabled={pending} onClick={() => setDeleteTarget(w)}>Delete</button>
+                </div>
+              </div>
+              {expanded === w.id && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-light)" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, maxHeight: 220, overflowY: "auto" }}>
+                    {jobOptions.length === 0 && <div style={{ fontSize: 13, color: "var(--text-dim)" }}>No jobs yet.</div>}
+                    {jobOptions.map((j) => (
+                      <label key={j.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text-secondary)" }}>
+                        <input
+                          type="checkbox"
+                          checked={assignSelection.includes(j.id)}
+                          onChange={(e) =>
+                            setAssignSelection((sel) => e.target.checked ? [...sel, j.id] : sel.filter((id) => id !== j.id))
+                          }
+                        />
+                        {j.label}
+                      </label>
+                    ))}
+                  </div>
+                  <button className="btn btn-primary" style={{ marginTop: 10 }} disabled={pending} onClick={() => saveAssignments(w.id)}>
+                    Save Assignments
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+          {workers.length === 0 && <div style={{ fontSize: 13, color: "var(--text-dim)" }}>No workers added yet.</div>}
+        </div>
+      </div>
+
+      <div className="card">
+        <h2 className="section-title" style={{ marginBottom: 12 }}>Add a Worker</h2>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <F label="Name">
+            <input className="input" value={newWorker.name} onChange={(e) => setNewWorker({ ...newWorker, name: e.target.value })} />
+          </F>
+          <F label="Username">
+            <input className="input" value={newWorker.username} onChange={(e) => setNewWorker({ ...newWorker, username: e.target.value })} />
+          </F>
+          <F label="Temporary Password">
+            <input type="text" className="input" value={newWorker.password} onChange={(e) => setNewWorker({ ...newWorker, password: e.target.value })} />
+          </F>
+        </div>
+        <button className="btn btn-primary" style={{ marginTop: 14 }} disabled={pending} onClick={addWorker}>
+          {pending ? <LoadingSpinner size={16} /> : "Add Worker"}
+        </button>
+      </div>
+
+      <Modal
+        open={resetTarget !== null}
+        onClose={() => setResetTarget(null)}
+        title="Reset Password"
+        footer={
+          <>
+            <button className="btn btn-secondary" onClick={() => setResetTarget(null)} disabled={pending}>Cancel</button>
+            <button className="btn btn-primary" onClick={doReset} disabled={pending}>
+              {pending ? <LoadingSpinner size={16} /> : "Reset Password"}
+            </button>
+          </>
+        }
+      >
+        <F label="New Password">
+          <input
+            type="text"
+            className="input"
+            autoFocus
+            value={resetPassword}
+            onChange={(e) => setResetPassword(e.target.value)}
+            placeholder="At least 6 characters"
+          />
+        </F>
+        <p style={{ fontSize: 12.5, color: "var(--text-dim)", marginTop: 8 }}>The worker will be signed out everywhere.</p>
+      </Modal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete worker?"
+        message={`This removes ${deleteTarget?.name ?? "this worker"}'s login and job assignments. This can't be undone.`}
+        confirmLabel="Delete"
+        danger
+        onConfirm={doDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </div>
+  );
+}
+
 function ExportTab() {
   const exports = [
     { type: "customers", label: "Customer List", desc: "All contacts with status, lead source, and estimate counts." },
@@ -340,7 +537,7 @@ const BACKUP_TABLE_LABELS: Record<string, string> = {
   specialProjects: "Special Projects", specialProjectFiles: "Special Project Files",
   estimateLineItems: "Line Items", estimatePhotos: "Photos", followUpReminders: "Follow-ups", proposals: "Proposals",
   budgetEntries: "Budget Entries", invoices: "Invoices", payments: "Payments", changeOrders: "Change Orders",
-  colorSelections: "Color Selections",
+  colorSelections: "Color Selections", workers: "Workers", workerAssignments: "Worker Job Assignments",
 };
 
 interface ImportSummary { counts: Record<string, number>; total: number; schemaVersion: string | null; schemaMatch: boolean }

@@ -1,19 +1,39 @@
 import { prisma } from "@/lib/prisma";
 import { rowToJobRates, rowToPaintDefaults } from "@/lib/jobRates";
+import { customerName } from "@/lib/format";
 import PageHeader from "@/components/PageHeader";
 import SettingsClient from "./SettingsClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const [company, business, procedures, zoho, jobRates, priceItems] = await Promise.all([
+  const [company, business, procedures, zoho, jobRates, priceItems, workerRows, estimates] = await Promise.all([
     prisma.companyProfile.findUnique({ where: { id: 1 } }),
     prisma.businessSettings.findUnique({ where: { id: 1 } }),
     prisma.procedureTemplate.findMany({ orderBy: { sortOrder: "asc" } }),
     prisma.zohoConfig.findUnique({ where: { id: 1 } }),
     prisma.jobRateSettings.findUnique({ where: { id: 1 } }),
     prisma.priceBookItem.findMany({ where: { type: "paint" }, orderBy: { sortOrder: "asc" } }),
+    prisma.worker.findMany({ orderBy: { createdAt: "asc" }, include: { assignments: true } }),
+    prisma.estimate.findMany({
+      orderBy: { updatedAt: "desc" },
+      include: { customer: true },
+    }),
   ]);
+
+  const workers = workerRows.map((w) => ({
+    id: w.id,
+    name: w.name,
+    username: w.username,
+    active: w.active,
+    assignedEstimateIds: w.assignments.map((a) => a.estimateId),
+  }));
+
+  const jobOptions = estimates.map((e) => ({
+    id: e.id,
+    status: e.status,
+    label: `${e.estimateNumber} — ${e.projectName || customerName(e.customer)}`,
+  }));
 
   const paintOptions = priceItems.map((p) => ({ id: p.id, label: `${p.brand ? p.brand + " — " : ""}${p.name}` }));
 
@@ -61,6 +81,8 @@ export default async function SettingsPage() {
         zoho={zohoData}
         jobRates={{ ...rowToJobRates(jobRates), ...rowToPaintDefaults(jobRates) }}
         paintOptions={paintOptions}
+        workers={workers}
+        jobOptions={jobOptions}
       />
     </div>
   );

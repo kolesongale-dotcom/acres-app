@@ -38,6 +38,7 @@ const TABLES: TableSpec[] = [
   { key: "procedureTemplates", model: "procedureTemplate", dateFields: [] },
   { key: "priceBookItems", model: "priceBookItem", dateFields: ["createdAt", "updatedAt"] },
   // Customers → Estimates → estimate children.
+  { key: "workers", model: "worker", dateFields: ["createdAt"] },
   { key: "customers", model: "customer", dateFields: ["createdAt", "updatedAt"] },
   { key: "estimates", model: "estimate", dateFields: ["startDate", "endDate", "completedAt", "createdAt", "updatedAt"] },
   { key: "rooms", model: "room", dateFields: [] },
@@ -57,6 +58,7 @@ const TABLES: TableSpec[] = [
   { key: "specialProjectFiles", model: "specialProjectFile", dateFields: ["createdAt"] },
   { key: "estimateLineItems", model: "estimateLineItem", dateFields: [] },
   { key: "estimatePhotos", model: "estimatePhoto", dateFields: ["createdAt"] },
+  { key: "workerAssignments", model: "workerAssignment", dateFields: ["createdAt"] },
   // References customers + estimates (estimateId is nullable / SetNull).
   { key: "followUpReminders", model: "followUpReminder", dateFields: ["dueDate", "createdAt"] },
   // Documents tied to an estimate.

@@ -113,6 +113,44 @@ model Estimate {
   photos           EstimatePhoto[]
   followUps        FollowUpReminder[]
   proposal         Proposal?
+  workerAssignments WorkerAssignment[]
+  // Job-site notes visible/editable by assigned workers. Separate from `notes`
+  // (owner's internal notes) so workers never see/overwrite pricing-adjacent notes.
+  workerNotes      String               @default("")
+}
+
+// A crew member with their own login, scoped to job-progress updates only (no
+// pricing/financials). Distinct from the single shared APP_PASSWORD owner login.
+model Worker {
+  id           Int                @id @default(autoincrement())
+  name         String
+  username     String             @unique
+  passwordHash String
+  active       Boolean            @default(true)
+  createdAt    DateTime           @default(now())
+  sessions     WorkerSession[]
+  assignments  WorkerAssignment[]
+}
+
+model WorkerSession {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  workerId  Int
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  worker    Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+}
+
+// Which workers are assigned to which job. Determines what a worker can see.
+model WorkerAssignment {
+  id         Int      @id @default(autoincrement())
+  workerId   Int
+  estimateId Int
+  createdAt  DateTime @default(now())
+  worker     Worker   @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  estimate   Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, estimateId])
 }
 
 // Job photos with captions. Shown on the estimate, proposal, and client sign page.

@@ -50,8 +50,14 @@ app/
     proposals/  [id]/            # list + estimator proposal detail (status/tier/SOP/email)
     price-book/                  # Paint + Materials/Supplies price book (cost + per-item markup)
     budget/     [estimateId]/    # overview (accepted only) + estimated-vs-actual detail
-    settings/                    # 5 tabs: company, business (deposit tiers), email, SOPs, data export
+    settings/                    # tabs: company, business (deposit tiers), email, SOPs, Zoho,
+                                 #   Workers (crew accounts + job assignment), data export
   proposals/[id]/sign/           # PUBLIC client-facing signing page (NO sidebar, light theme)
+  worker/                        # PUBLIC-ish crew area, own login, own cookie (see below)
+    login/                       # crew login form
+    (crew)/                      # route group: session-gated, no sidebar
+      page.tsx                   # assigned-jobs list
+      jobs/[id]/                 # job detail: notes, mark complete, photos — no pricing
   api/export/                    # GET ?type=customers|estimates|proposals|invoices|payments|
                                  #   changeorders|colorsheets|pricebook|budget|followups|all → .xlsx
                                  #   (each type = one sheet; "all" = every sheet in one workbook)
@@ -65,7 +71,8 @@ lib/
   idGenerator.ts                 # customer (A001→Z999→AA001) + EST-/PRO- numbers
   format.ts                      # date/name helpers
   types.ts                       # shared enums + payload types
-  actions/                       # customers, estimates, proposals, budget, settings, followups
+  workerAuth.ts                  # crew session helpers (separate from lib/auth.ts, the owner gate)
+  actions/                       # customers, estimates, proposals, budget, settings, followups, workers
 prisma/
   schema.prisma  seed.ts  migrations/  dev.db
 ```
@@ -83,6 +90,8 @@ prisma/
   it separately). Estimated columns are derived from the estimate; actual columns are
   hand-entered.
 - `ProcedureTemplate` = SOP library. `CompanyProfile`/`BusinessSettings` are singletons (id=1).
+- `Worker` 1—N `WorkerSession` (login sessions) and 1—N `WorkerAssignment` (join table) → `Estimate`.
+  See "Crew / worker access" below.
 
 ## Job Rates (Settings) + per-estimate snapshot
 
@@ -386,7 +395,9 @@ can use it on a phone with the PC off (see `DEPLOY.md` for the click-by-click gu
   the **idempotent** seed (singletons via `upsert {update:{}}`; lists only seed when empty — safe to
   run every deploy) then `next start`. `postinstall` runs `prisma generate`. `tsx` is a runtime dep
   (seed runs at startup).
-- **Auth:** `middleware.ts` gates the back office. **OFF when `APP_PASSWORD` is empty** (local default),
+- **Auth:** `proxy.ts` (Next's "proxy" convention, formerly `middleware.ts` — always runs on the
+  Node.js runtime, so it can query Prisma directly) gates the back office. **OFF when `APP_PASSWORD`
+  is empty** (local default),
   **ON when set** (cloud). Public without login: `/login`, `/uploads/*`, `/_next/*`, and
   `/proposals/<id>/sign` (clients must reach + e-sign without an account). Login (`lib/actions/auth.ts`)
   checks the password, sets an httpOnly cookie `acres_session` = `AUTH_SECRET`; middleware compares it.
@@ -396,6 +407,33 @@ can use it on a phone with the PC off (see `DEPLOY.md` for the click-by-click gu
   `serverActions.allowedOrigins` includes `*.up.railway.app`. Code lives in git (branch `main`),
   pushed to a private GitHub repo; **deploy = git push** (Railway auto-builds).
 - **Local vs cloud are separate databases** by design (dev sandbox vs. real data).
+
+## Crew / worker access (`/worker`)
+
+A separate, much narrower login for painters so they can update job progress from their phones
+without seeing pricing, estimates, or customer financials — independent of the owner's single
+shared `APP_PASSWORD`.
+- **Data model:** `Worker` (name, username, bcrypt `passwordHash`, `active`), `WorkerSession`
+  (random token + expiry, looked up on every request — deactivating a worker or resetting their
+  password invalidates sessions immediately), `WorkerAssignment` (join table: which workers can see
+  which `Estimate`). `Estimate.workerNotes` is a separate free-text field from the owner's internal
+  `notes`, so crew updates never collide with/overwrite office notes.
+- **Auth:** `lib/workerAuth.ts` (session helpers) + `lib/actions/workers.ts` (`workerLogin`/
+  `workerLogout`, owner-side worker CRUD, `setWorkerAssignments`). `proxy.ts` gates `/worker/*`
+  separately from the owner gate: any path under `/worker` other than `/worker/login` requires a
+  valid, non-expired `WorkerSession` for an `active` worker, checked directly against the DB (this is
+  why `proxy.ts` needs the Node.js runtime). `/api/upload` (used for job photos) accepts either the
+  owner cookie or a valid worker session.
+- **Owner side:** Settings → **Workers** tab (`WorkersTab` in `SettingsClient.tsx`) — add/deactivate/
+  delete workers, reset passwords (also nukes their sessions), and assign/unassign jobs per worker.
+- **Worker side:** `app/worker/login` (own login form, own cookie `acres_worker_session`);
+  `app/worker/(crew)/` route group (layout checks the session, shows name + Sign Out) —
+  `/worker` lists only that worker's assigned jobs (project, address, status), `/worker/jobs/[id]`
+  shows customer name/phone/email/address, lets them edit `workerNotes`, toggle `completedAt`
+  ("Mark Job Complete" — reuses the same field the warranty clock already runs from) and add/delete
+  `EstimatePhoto`s. No pricing, line items, or tiers are ever rendered on `/worker/*`. Every worker
+  action server-side re-checks the `WorkerAssignment` before touching an estimate (an unassigned job
+  404s), not just the UI.
 
 ## Conventions
 
